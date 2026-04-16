@@ -4,6 +4,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from .logging_utils import get_logger
 
 DEFAULT_CHAT_MODEL = "gpt-4.1-mini"
 DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
@@ -15,6 +16,8 @@ DEFAULT_VECTOR_STORE_PATH = ".cache/vector_store.json"
 DEFAULT_RAG_TOP_K = 4
 DEFAULT_CHUNK_SIZE = 800
 DEFAULT_CHUNK_OVERLAP = 120
+
+logger = get_logger(__name__)
 
 
 def _read_optional_env(*names: str) -> str | None:
@@ -37,7 +40,9 @@ def _is_explicitly_blank(*names: str) -> bool:
 
 
 def get_project_root() -> Path:
-    return Path(__file__).resolve().parents[2]
+    project_root = Path(__file__).resolve().parents[2]
+    logger.debug("解析项目根目录: %s", project_root)
+    return project_root
 
 
 def resolve_proxy_url() -> str:
@@ -48,7 +53,9 @@ def resolve_proxy_url() -> str:
         "HTTP_PROXY",
         "http_proxy",
     )
-    return proxy or DEFAULT_PROXY_URL
+    resolved = proxy or DEFAULT_PROXY_URL
+    logger.debug("解析代理地址: %s", resolved)
+    return resolved
 
 
 def apply_proxy_defaults(proxy_url: str, no_proxy: str) -> None:
@@ -56,6 +63,7 @@ def apply_proxy_defaults(proxy_url: str, no_proxy: str) -> None:
     os.environ.setdefault("HTTPS_PROXY", proxy_url)
     os.environ.setdefault("NO_PROXY", no_proxy)
     os.environ.setdefault("OPENAI_PROXY", proxy_url)
+    logger.debug("已应用代理默认值: proxy=%s, no_proxy=%s", proxy_url, no_proxy)
 
 
 @dataclass(frozen=True)
@@ -121,7 +129,7 @@ def load_settings() -> Settings:
     if embedding_model is None and not _is_explicitly_blank("OPENAI_EMBEDDING_MODEL"):
         embedding_model = DEFAULT_EMBEDDING_MODEL
 
-    return Settings(
+    settings = Settings(
         project_root=project_root,
         knowledge_dir=knowledge_dir,
         vector_store_path=vector_store_path,
@@ -148,3 +156,18 @@ def load_settings() -> Settings:
         chunk_size=_read_int_env("RAG_CHUNK_SIZE", DEFAULT_CHUNK_SIZE),
         chunk_overlap=_read_int_env("RAG_CHUNK_OVERLAP", DEFAULT_CHUNK_OVERLAP),
     )
+    logger.info(
+        "配置加载完成: knowledge_dir=%s, vector_store_path=%s, chat_model=%s, "
+        "embedding_model=%s, rag_top_k=%s, chunk_size=%s, chunk_overlap=%s, "
+        "chat_api_key=%s, embedding_api_key=%s",
+        settings.knowledge_dir,
+        settings.vector_store_path,
+        settings.chat_model,
+        settings.embedding_model,
+        settings.rag_top_k,
+        settings.chunk_size,
+        settings.chunk_overlap,
+        "set" if settings.chat_api_key else "missing",
+        "set" if settings.embedding_api_key else "missing",
+    )
+    return settings

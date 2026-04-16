@@ -3,8 +3,14 @@ from __future__ import annotations
 from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 
+from .logging_utils import get_logger
+
+
+logger = get_logger(__name__)
+
 
 def build_summary_prompt() -> PromptTemplate:
+    logger.debug("构建摘要 PromptTemplate。")
     return PromptTemplate.from_template(
         "\n".join(
             [
@@ -20,6 +26,7 @@ def build_summary_prompt() -> PromptTemplate:
 
 
 def build_rag_prompt() -> ChatPromptTemplate:
+    logger.debug("构建 RAG ChatPromptTemplate。")
     return ChatPromptTemplate.from_messages(
         [
             (
@@ -47,11 +54,14 @@ def build_rag_prompt() -> ChatPromptTemplate:
 
 def format_documents(documents: list[Document]) -> str:
     if not documents:
+        logger.info("没有检索到文档，将返回空上下文提示。")
         return "没有检索到相关文档。"
 
+    logger.debug("开始格式化检索文档: count=%s", len(documents))
     blocks: list[str] = []
     for document in documents:
         source = document.metadata.get("source", "unknown")
         chunk = document.metadata.get("chunk", "?")
         blocks.append(f"[{source}#chunk-{chunk}]\n{document.page_content}")
+    logger.debug("检索文档格式化完成: count=%s", len(blocks))
     return "\n\n".join(blocks)

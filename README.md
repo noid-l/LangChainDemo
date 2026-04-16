@@ -18,11 +18,11 @@
 ## 快速开始
 
 ```bash
-/opt/homebrew/bin/uv sync
+uv sync
 cp .env.example .env
 ```
 
-默认代理配置参考 `/Users/lishuo/Workspace.localized/env/bin/codex` 中的设置：
+如果你的网络环境需要代理，可以按实际情况配置：
 
 ```bash
 HTTP_PROXY=http://127.0.0.1:7890
@@ -63,37 +63,37 @@ OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 离线查看 PromptTemplate 渲染结果：
 
 ```bash
-/opt/homebrew/bin/uv run langchaindemo --topic "介绍 LangChain" --tone "专业" --dry-run
+uv run langchaindemo --topic "介绍 LangChain" --tone "专业" --dry-run
 ```
 
 调用 OpenAI 执行普通生成：
 
 ```bash
-/opt/homebrew/bin/uv run langchaindemo prompt --topic "介绍 LangChain" --tone "专业"
+uv run langchaindemo prompt --topic "介绍 LangChain" --tone "专业"
 ```
 
 构建本地知识库索引：
 
 ```bash
-/opt/homebrew/bin/uv run langchaindemo rag build
+uv run langchaindemo rag build
 ```
 
 离线预览 RAG 提示词：
 
 ```bash
-/opt/homebrew/bin/uv run langchaindemo rag ask "RAG 的典型流程是什么？" --dry-run
+uv run langchaindemo rag ask "RAG 的典型流程是什么？" --dry-run
 ```
 
 执行真实 RAG 问答：
 
 ```bash
-/opt/homebrew/bin/uv run langchaindemo rag ask "RAG 的典型流程是什么？"
+uv run langchaindemo rag ask "RAG 的典型流程是什么？"
 ```
 
 查看当前生效配置：
 
 ```bash
-/opt/homebrew/bin/uv run langchaindemo config
+uv run langchaindemo config
 ```
 
 ## 项目结构
