@@ -1,5 +1,5 @@
 [project]
-name = "jeecglangchain"
+name = "LangChainDemo"
 version = "0.1.0"
 description = "A uv-based LangChain starter project"
 readme = "README.md"
@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.scripts]
-jeecglangchain = "jeecglangchain:main"
+langchaindemo = "langchaindemo:main"
 
 [build-system]
 requires = ["uv_build>=0.11.3,<0.12.0"]

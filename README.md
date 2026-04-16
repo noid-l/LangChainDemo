@@ -1,4 +1,4 @@
-# JeecgLangChain
+# LangChainDemo
 
 使用 `uv` 初始化的 LangChain 项目骨架，包含以下能力：
 
@@ -63,37 +63,37 @@ OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 离线查看 PromptTemplate 渲染结果：
 
 ```bash
-/opt/homebrew/bin/uv run jeecglangchain --topic "介绍 LangChain" --tone "专业" --dry-run
+/opt/homebrew/bin/uv run langchaindemo --topic "介绍 LangChain" --tone "专业" --dry-run
 ```
 
 调用 OpenAI 执行普通生成：
 
 ```bash
-/opt/homebrew/bin/uv run jeecglangchain prompt --topic "介绍 LangChain" --tone "专业"
+/opt/homebrew/bin/uv run langchaindemo prompt --topic "介绍 LangChain" --tone "专业"
 ```
 
 构建本地知识库索引：
 
 ```bash
-/opt/homebrew/bin/uv run jeecglangchain rag build
+/opt/homebrew/bin/uv run langchaindemo rag build
 ```
 
 离线预览 RAG 提示词：
 
 ```bash
-/opt/homebrew/bin/uv run jeecglangchain rag ask "RAG 的典型流程是什么？" --dry-run
+/opt/homebrew/bin/uv run langchaindemo rag ask "RAG 的典型流程是什么？" --dry-run
 ```
 
 执行真实 RAG 问答：
 
 ```bash
-/opt/homebrew/bin/uv run jeecglangchain rag ask "RAG 的典型流程是什么？"
+/opt/homebrew/bin/uv run langchaindemo rag ask "RAG 的典型流程是什么？"
 ```
 
 查看当前生效配置：
 
 ```bash
-/opt/homebrew/bin/uv run jeecglangchain config
+/opt/homebrew/bin/uv run langchaindemo config
 ```
 
 ## 项目结构
@@ -106,14 +106,14 @@ OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 ├── .env.example
 ├── .cache/
 ├── skills/
-└── src/jeecglangchain/
+└── src/langchaindemo/
 ```
 
 ## 模块说明
 
-- `src/jeecglangchain/config.py`：环境变量、路径与代理配置
-- `src/jeecglangchain/openai_support.py`：OpenAI 聊天模型与 embeddings 工厂
-- `src/jeecglangchain/prompting.py`：PromptTemplate 与 RAG 提示词模板
-- `src/jeecglangchain/knowledge.py`：知识库文档加载与文本切分
-- `src/jeecglangchain/rag.py`：索引构建、检索、RAG 问答与离线预览
-- `src/jeecglangchain/cli.py`：命令行入口
+- `src/langchaindemo/config.py`：环境变量、路径与代理配置
+- `src/langchaindemo/openai_support.py`：OpenAI 聊天模型与 embeddings 工厂
+- `src/langchaindemo/prompting.py`：PromptTemplate 与 RAG 提示词模板
+- `src/langchaindemo/knowledge.py`：知识库文档加载与文本切分
+- `src/langchaindemo/rag.py`：索引构建、检索、RAG 问答与离线预览
+- `src/langchaindemo/cli.py`：命令行入口
