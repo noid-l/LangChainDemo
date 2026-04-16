@@ -1,0 +1,23 @@
+[project]
+name = "jeecglangchain"
+version = "0.1.0"
+description = "A uv-based LangChain starter project"
+readme = "README.md"
+authors = [
+    { name = "shuo li", email = "lishuo@dachkj.com" }
+]
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "langchain>=1.2.15",
+    "langchain-core>=1.2.30",
+    "langchain-openai>=1.1.13",
+    "numpy>=2.4.4",
+    "python-dotenv>=1.2.2",
+]
+
+[project.scripts]
+jeecglangchain = "jeecglangchain:main"
+
+[build-system]
+requires = ["uv_build>=0.11.3,<0.12.0"]
+build-backend = "uv_build"
