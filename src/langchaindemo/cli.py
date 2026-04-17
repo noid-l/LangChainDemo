@@ -12,9 +12,17 @@ from .logging_utils import configure_logging, get_logger
 from .openai_support import build_chat_model, ensure_chat_api_key
 from .prompting import build_summary_prompt
 from .rag import answer_question, build_index, preview_question
+from .weather import (
+    AmbiguousLocationError,
+    WeatherError,
+    format_location_summary,
+    format_weather_report,
+    query_weather,
+)
+from .weather_langchain import answer_weather_question
 
 
-KNOWN_COMMANDS = {"prompt", "rag", "config"}
+KNOWN_COMMANDS = {"prompt", "rag", "config", "weather"}
 logger = get_logger(__name__)
 
 
@@ -68,6 +76,51 @@ def build_parser() -> argparse.ArgumentParser:
     rag_ask_parser.add_argument("--dry-run", action="store_true")
     rag_ask_parser.set_defaults(handler=handle_rag_ask)
 
+    weather_parser = subparsers.add_parser("weather", help="天气查询示例")
+    weather_subparsers = weather_parser.add_subparsers(
+        dest="weather_command", required=True
+    )
+
+    weather_query_parser = weather_subparsers.add_parser(
+        "query", help="直接查询天气"
+    )
+    weather_query_parser.add_argument(
+        "location", help="城市名/地区名，或 `longitude,latitude`"
+    )
+    weather_query_parser.add_argument(
+        "--adm",
+        default=None,
+        help="上级行政区，用于消歧，例如 `黑龙江` 或 `beijing`",
+    )
+    weather_query_parser.add_argument(
+        "--lang",
+        default=None,
+        help="语言设置，默认使用 WEATHER_LANG 或 zh",
+    )
+    weather_query_parser.add_argument(
+        "--unit",
+        choices=("m", "i"),
+        default=None,
+        help="单位设置：m 为公制，i 为英制",
+    )
+    weather_query_parser.add_argument(
+        "--days",
+        type=int,
+        choices=(3, 7),
+        default=None,
+        help="预报天数，目前支持 3 或 7",
+    )
+    weather_query_parser.set_defaults(handler=handle_weather_query)
+
+    weather_ask_parser = weather_subparsers.add_parser(
+        "ask", help="使用 LangChain Agent 理解自然语言天气问题"
+    )
+    weather_ask_parser.add_argument(
+        "question",
+        help="自然语言天气问题，例如 `明天北京天气怎么样？`",
+    )
+    weather_ask_parser.set_defaults(handler=handle_weather_ask)
+
     config_parser = subparsers.add_parser("config", help="查看当前有效配置")
     config_parser.set_defaults(handler=handle_config)
     return parser
@@ -76,6 +129,9 @@ def build_parser() -> argparse.ArgumentParser:
 def normalize_argv(argv: list[str]) -> list[str]:
     if not argv:
         return ["prompt"]
+    if argv[0] == "weather" and len(argv) >= 2:
+        if argv[1] not in {"query", "ask"} and not argv[1].startswith("-"):
+            return ["weather", "query", *argv[1:]]
     if argv[0] in KNOWN_COMMANDS:
         return argv
     if argv[0].startswith("-"):
@@ -140,6 +196,11 @@ def handle_rag_ask(args: argparse.Namespace) -> None:
 def handle_config(_args: argparse.Namespace) -> None:
     logger.info("开始执行 config 命令。")
     settings = load_settings()
+    if settings.qweather_api_host and "devapi.qweather.com" in settings.qweather_api_host:
+        logger.warning(
+            "检测到旧的 QWEATHER API Host=%s。JWT 模式下应改为控制台分配的专属 Host。",
+            settings.qweather_api_host,
+        )
     print(f"project_root={settings.project_root}")
     print(f"knowledge_dir={settings.knowledge_dir}")
     print(f"vector_store_path={settings.vector_store_path}")
@@ -154,7 +215,62 @@ def handle_config(_args: argparse.Namespace) -> None:
     print(f"rag_top_k={settings.rag_top_k}")
     print(f"chunk_size={settings.chunk_size}")
     print(f"chunk_overlap={settings.chunk_overlap}")
+    print(
+        f"qweather_project_id={'set' if settings.qweather_project_id else 'missing'}"
+    )
+    print(f"qweather_key_id={'set' if settings.qweather_key_id else 'missing'}")
+    print(
+        f"qweather_private_key={'set' if settings.qweather_private_key else 'missing'}"
+    )
+    print(
+        "qweather_private_key_path="
+        f"{settings.qweather_private_key_path or 'missing'}"
+    )
+    print(f"qweather_api_host={settings.qweather_api_host or 'missing'}")
+    print(f"qweather_jwt_ttl_seconds={settings.qweather_jwt_ttl_seconds}")
+    print(f"weather_lang={settings.weather_lang}")
+    print(f"weather_unit={settings.weather_unit}")
+    print(f"weather_forecast_days={settings.weather_forecast_days}")
+    print(f"weather_timeout_seconds={settings.weather_timeout_seconds}")
     logger.info("config 命令输出完成。")
+
+
+def handle_weather_query(args: argparse.Namespace) -> None:
+    logger.info("开始执行 weather query 命令。")
+    settings = load_settings()
+    try:
+        result = query_weather(
+            settings,
+            location=args.location,
+            adm=args.adm,
+            lang=args.lang,
+            unit=args.unit,
+            forecast_days=args.days,
+        )
+    except AmbiguousLocationError as exc:
+        logger.error("地点匹配到多个候选，请使用 --adm 或经纬度重新查询。")
+        for index, candidate in enumerate(exc.candidates, start=1):
+            logger.error("候选 %s: %s", index, format_location_summary(candidate))
+        raise SystemExit(1) from exc
+    except WeatherError as exc:
+        logger.error("%s", exc)
+        raise SystemExit(1) from exc
+
+    logger.info("weather query 命令执行完成，开始输出结果。")
+    print(format_weather_report(result))
+
+
+def handle_weather_ask(args: argparse.Namespace) -> None:
+    logger.info("开始执行 weather ask 命令。")
+    settings = load_settings()
+    try:
+        answer = answer_weather_question(args.question, settings)
+    except WeatherError as exc:
+        logger.error("%s", exc)
+        raise SystemExit(1) from exc
+
+    logger.info("weather ask 命令执行完成，开始输出结果。")
+    print(answer)
 
 
 def main() -> None:

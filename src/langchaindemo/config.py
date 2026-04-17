@@ -16,6 +16,11 @@ DEFAULT_VECTOR_STORE_PATH = ".cache/vector_store.json"
 DEFAULT_RAG_TOP_K = 4
 DEFAULT_CHUNK_SIZE = 800
 DEFAULT_CHUNK_OVERLAP = 120
+DEFAULT_QWEATHER_JWT_TTL_SECONDS = 900
+DEFAULT_WEATHER_LANG = "zh"
+DEFAULT_WEATHER_UNIT = "m"
+DEFAULT_WEATHER_FORECAST_DAYS = 3
+DEFAULT_WEATHER_TIMEOUT_SECONDS = 10.0
 
 logger = get_logger(__name__)
 
@@ -33,6 +38,24 @@ def _read_int_env(name: str, default: int) -> int:
     if raw is None or not raw.strip():
         return default
     return int(raw)
+
+
+def _read_float_env(name: str, default: float) -> float:
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return default
+    return float(raw)
+
+
+def _normalize_url(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip()
+    if not normalized:
+        return None
+    if "://" not in normalized:
+        normalized = f"https://{normalized}"
+    return normalized.rstrip("/")
 
 
 def _is_explicitly_blank(*names: str) -> bool:
@@ -82,6 +105,16 @@ class Settings:
     rag_top_k: int
     chunk_size: int
     chunk_overlap: int
+    qweather_project_id: str | None
+    qweather_key_id: str | None
+    qweather_private_key: str | None
+    qweather_private_key_path: str | None
+    qweather_api_host: str | None
+    qweather_jwt_ttl_seconds: int
+    weather_lang: str
+    weather_unit: str
+    weather_forecast_days: int
+    weather_timeout_seconds: float
 
 
 def load_settings() -> Settings:
@@ -155,11 +188,32 @@ def load_settings() -> Settings:
         rag_top_k=_read_int_env("RAG_TOP_K", DEFAULT_RAG_TOP_K),
         chunk_size=_read_int_env("RAG_CHUNK_SIZE", DEFAULT_CHUNK_SIZE),
         chunk_overlap=_read_int_env("RAG_CHUNK_OVERLAP", DEFAULT_CHUNK_OVERLAP),
+        qweather_project_id=_read_optional_env("QWEATHER_PROJECT_ID"),
+        qweather_key_id=_read_optional_env("QWEATHER_KEY_ID"),
+        qweather_private_key=_read_optional_env("QWEATHER_PRIVATE_KEY"),
+        qweather_private_key_path=_read_optional_env("QWEATHER_PRIVATE_KEY_PATH"),
+        qweather_api_host=_normalize_url(
+            _read_optional_env("QWEATHER_API_HOST", "QWEATHER_BASE_URL")
+        ),
+        qweather_jwt_ttl_seconds=_read_int_env(
+            "QWEATHER_JWT_TTL_SECONDS", DEFAULT_QWEATHER_JWT_TTL_SECONDS
+        ),
+        weather_lang=_read_optional_env("WEATHER_LANG") or DEFAULT_WEATHER_LANG,
+        weather_unit=_read_optional_env("WEATHER_UNIT") or DEFAULT_WEATHER_UNIT,
+        weather_forecast_days=_read_int_env(
+            "WEATHER_FORECAST_DAYS", DEFAULT_WEATHER_FORECAST_DAYS
+        ),
+        weather_timeout_seconds=_read_float_env(
+            "WEATHER_TIMEOUT_SECONDS", DEFAULT_WEATHER_TIMEOUT_SECONDS
+        ),
     )
     logger.info(
         "配置加载完成: knowledge_dir=%s, vector_store_path=%s, chat_model=%s, "
         "embedding_model=%s, rag_top_k=%s, chunk_size=%s, chunk_overlap=%s, "
-        "chat_api_key=%s, embedding_api_key=%s",
+        "chat_api_key=%s, embedding_api_key=%s, qweather_project_id=%s, "
+        "qweather_key_id=%s, qweather_private_key=%s, qweather_private_key_path=%s, "
+        "qweather_api_host=%s, qweather_jwt_ttl_seconds=%s, "
+        "weather_lang=%s, weather_unit=%s, weather_forecast_days=%s",
         settings.knowledge_dir,
         settings.vector_store_path,
         settings.chat_model,
@@ -169,5 +223,14 @@ def load_settings() -> Settings:
         settings.chunk_overlap,
         "set" if settings.chat_api_key else "missing",
         "set" if settings.embedding_api_key else "missing",
+        "set" if settings.qweather_project_id else "missing",
+        "set" if settings.qweather_key_id else "missing",
+        "set" if settings.qweather_private_key else "missing",
+        "set" if settings.qweather_private_key_path else "missing",
+        settings.qweather_api_host or "missing",
+        settings.qweather_jwt_ttl_seconds,
+        settings.weather_lang,
+        settings.weather_unit,
+        settings.weather_forecast_days,
     )
     return settings
