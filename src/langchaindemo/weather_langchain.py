@@ -38,7 +38,7 @@ WEATHER_AGENT_SYSTEM_PROMPT = "\n".join(
 class WeatherToolInput(BaseModel):
     location: str = Field(
         ...,
-        description="城市名/地区名，或 `longitude,latitude` 格式的经纬度。",
+        description="城市名/地区名，或经纬度（支持 `经度,纬度` 和 `纬度,经度` 两种格式）。",
     )
     adm: str | None = Field(
         default=None,

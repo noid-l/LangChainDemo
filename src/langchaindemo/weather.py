@@ -238,11 +238,21 @@ def is_coordinate_query(location: str) -> bool:
 
 def normalize_coordinate_query(location: str) -> str:
     if not is_coordinate_query(location):
-        raise WeatherConfigError("经纬度格式无效，请使用 `longitude,latitude`。")
+        raise WeatherConfigError("经纬度格式无效，请使用 `经度,纬度` 或 `纬度,经度` 格式。")
 
-    longitude_text, latitude_text = [part.strip() for part in location.split(",", 1)]
-    longitude = float(longitude_text)
-    latitude = float(latitude_text)
+    first_text, second_text = [part.strip() for part in location.split(",", 1)]
+    first_val = float(first_text)
+    second_val = float(second_text)
+
+    # 自动识别 lat,lon 与 lon,lat 格式：超过 ±90 的值一定是经度
+    if abs(first_val) > 90 and abs(second_val) <= 90:
+        longitude, latitude = first_val, second_val
+    elif abs(second_val) > 90 and abs(first_val) <= 90:
+        longitude, latitude = second_val, first_val
+    else:
+        # 两个值都在 [-90, 90]，按 lon,lat 约定处理
+        longitude, latitude = first_val, second_val
+
     if not -180 <= longitude <= 180:
         raise WeatherConfigError("经度超出范围，必须在 -180 到 180 之间。")
     if not -90 <= latitude <= 90:

@@ -19,10 +19,22 @@ from .weather import (
     format_weather_report,
     query_weather,
 )
+from .weather_chain import summarize_weather, summarize_weather_batch, summarize_weather_stream
 from .weather_langchain import answer_weather_question
+from .weather_streaming import stream_weather_agent_answer, stream_weather_report_lines
+from .weather_structured import advise_weather
+from .weather_memory import chat_turn, clear_session, format_history, get_session, list_sessions
+from .weather_multi_tool import answer_with_multi_tool
+from .weather_tracing import WeatherTraceHandler
+from .weather_graph import answer_weather_graph
+from .unified_agent import chat_unified, chat_unified_stream
+from .web_search import search_and_answer
+from .document_qa import answer_document_question
+from .data_analysis import analyze_csv
+from .translate import translate_text, translate_batch
 
 
-KNOWN_COMMANDS = {"prompt", "rag", "config", "weather"}
+KNOWN_COMMANDS = {"chat", "prompt", "rag", "config", "weather", "search", "doc", "analyze", "translate"}
 logger = get_logger(__name__)
 
 
@@ -52,6 +64,38 @@ def build_parser() -> argparse.ArgumentParser:
         description="LangChain + OpenAI + PromptTemplate + RAG demo project."
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+    chat_parser = subparsers.add_parser(
+        "chat",
+        help="统一 Agent 入口（天气 + 知识库 + 闲聊，自动路由）",
+    )
+    chat_parser.add_argument(
+        "question",
+        nargs="?",
+        default=None,
+        help="问题（省略则进入交互模式）",
+    )
+    chat_parser.add_argument(
+        "--stream",
+        action="store_true",
+        help="流式输出",
+    )
+    chat_parser.add_argument(
+        "--trace",
+        action="store_true",
+        help="启用回调追踪",
+    )
+    chat_parser.add_argument(
+        "--trace-output",
+        default=None,
+        help="追踪日志输出文件路径",
+    )
+    chat_parser.add_argument(
+        "--session",
+        default="default",
+        help="会话 ID（默认 default）",
+    )
+    chat_parser.set_defaults(handler=handle_chat)
 
     prompt_parser = subparsers.add_parser("prompt", help="运行 PromptTemplate 示例")
     prompt_parser.add_argument("--topic", default="什么是 LangChain？")
@@ -119,7 +163,165 @@ def build_parser() -> argparse.ArgumentParser:
         "question",
         help="自然语言天气问题，例如 `明天北京天气怎么样？`",
     )
+    weather_ask_parser.add_argument(
+        "--stream",
+        action="store_true",
+        help="流式输出（逐 token 打印，演示 Runnable.stream）",
+    )
+    weather_ask_parser.add_argument(
+        "--multi-tool",
+        action="store_true",
+        help="启用多工具 Agent（天气查询+对比+穿衣建议）",
+    )
+    weather_ask_parser.add_argument(
+        "--trace",
+        action="store_true",
+        help="启用回调追踪（演示 BaseCallbackHandler）",
+    )
+    weather_ask_parser.add_argument(
+        "--trace-output",
+        default=None,
+        help="追踪日志输出文件路径",
+    )
     weather_ask_parser.set_defaults(handler=handle_weather_ask)
+
+    weather_summarize_parser = weather_subparsers.add_parser(
+        "summarize",
+        help="使用 LCEL 链生成天气摘要（演示 Runnable invoke/stream/batch）",
+    )
+    weather_summarize_parser.add_argument("location", help="城市名或地区名")
+    weather_summarize_parser.add_argument(
+        "--style",
+        choices=("brief", "detailed", "casual"),
+        default="brief",
+        help="摘要风格（默认 brief）",
+    )
+    weather_summarize_parser.add_argument(
+        "--adm",
+        default=None,
+        help="上级行政区，用于消歧",
+    )
+    weather_summarize_parser.add_argument(
+        "--mode",
+        choices=("lcel", "deterministic"),
+        default="lcel",
+        help="实现模式：lcel 使用 LCEL 链，deterministic 使用手动调用（默认 lcel）",
+    )
+    weather_summarize_parser.add_argument(
+        "--stream",
+        action="store_true",
+        help="使用流式输出（逐 token 打印）",
+    )
+    weather_summarize_parser.set_defaults(handler=handle_weather_summarize)
+
+    weather_batch_parser = weather_subparsers.add_parser(
+        "summarize-batch",
+        help="批量天气摘要（演示 Runnable.batch 并发处理）",
+    )
+    weather_batch_parser.add_argument(
+        "locations", nargs="+", help="多个城市名，空格分隔"
+    )
+    weather_batch_parser.add_argument(
+        "--style",
+        choices=("brief", "detailed", "casual"),
+        default="brief",
+        help="摘要风格（默认 brief）",
+    )
+    weather_batch_parser.set_defaults(handler=handle_weather_summarize_batch)
+
+    weather_advise_parser = weather_subparsers.add_parser(
+        "advise",
+        help="结构化穿衣建议（演示 with_structured_output / PydanticOutputParser）",
+    )
+    weather_advise_parser.add_argument("location", help="城市名或地区名")
+    weather_advise_parser.add_argument(
+        "--adm", default=None, help="上级行政区，用于消歧"
+    )
+    weather_advise_parser.add_argument(
+        "--mode",
+        choices=("deterministic", "langchain"),
+        default="deterministic",
+        help="实现模式（默认 deterministic）",
+    )
+    weather_advise_parser.add_argument(
+        "--json",
+        dest="output_json",
+        action="store_true",
+        help="输出原始 JSON",
+    )
+    weather_advise_parser.set_defaults(handler=handle_weather_advise)
+
+    weather_chat_parser = weather_subparsers.add_parser(
+        "chat",
+        help="多轮天气对话（演示 ChatMessageHistory 对话记忆）",
+    )
+    weather_chat_parser.add_argument(
+        "--session",
+        default="default",
+        help="会话名称（默认 default）",
+    )
+    weather_chat_parser.add_argument(
+        "--history",
+        action="store_true",
+        help="打印会话历史后退出",
+    )
+    weather_chat_parser.set_defaults(handler=handle_weather_chat)
+
+    weather_graph_parser = weather_subparsers.add_parser(
+        "graph",
+        help="LangGraph 工作流天气问答（演示 StateGraph 条件路由）",
+    )
+    weather_graph_parser.add_argument(
+        "question",
+        nargs="?",
+        default=None,
+        help="天气问题",
+    )
+    weather_graph_parser.add_argument(
+        "--thread",
+        default="default",
+        help="会话线程 ID（默认 default）",
+    )
+    weather_graph_parser.add_argument(
+        "--repl",
+        action="store_true",
+        help="交互式多轮对话模式",
+    )
+    weather_graph_parser.set_defaults(handler=handle_weather_graph)
+
+    # === 新领域子命令 ===
+
+    search_parser = subparsers.add_parser(
+        "search", help="网页搜索（演示 Web Search 工具）"
+    )
+    search_parser.add_argument("question", help="搜索问题")
+    search_parser.set_defaults(handler=handle_search)
+
+    doc_parser = subparsers.add_parser(
+        "doc", help="文档问答（演示 Document Loaders）"
+    )
+    doc_parser.add_argument("file_path", help="文档路径（PDF/Word/TXT）")
+    doc_parser.add_argument("question", help="关于文档的问题")
+    doc_parser.set_defaults(handler=handle_doc)
+
+    analyze_parser = subparsers.add_parser(
+        "analyze", help="数据分析（演示代码生成 + 执行）"
+    )
+    analyze_parser.add_argument("file_path", help="CSV 文件路径")
+    analyze_parser.add_argument("question", help="关于数据的问题")
+    analyze_parser.set_defaults(handler=handle_analyze)
+
+    translate_parser = subparsers.add_parser(
+        "translate", help="翻译（演示 FewShotPromptTemplate）"
+    )
+    translate_parser.add_argument("text", help="要翻译的文本")
+    translate_parser.add_argument(
+        "--target-lang", default="中文", help="目标语言（默认中文）"
+    )
+    translate_parser.add_argument(
+        "--source-lang", default="English", help="源语言（默认 English）"
+    )
+    translate_parser.set_defaults(handler=handle_translate)
 
     config_parser = subparsers.add_parser("config", help="查看当前有效配置")
     config_parser.set_defaults(handler=handle_config)
@@ -128,15 +330,15 @@ def build_parser() -> argparse.ArgumentParser:
 
 def normalize_argv(argv: list[str]) -> list[str]:
     if not argv:
-        return ["prompt"]
+        return ["chat"]
     if argv[0] == "weather" and len(argv) >= 2:
-        if argv[1] not in {"query", "ask"} and not argv[1].startswith("-"):
+        weather_subcmds = {"query", "ask", "summarize", "summarize-batch", "advise", "chat", "graph"}
+        if argv[1] not in weather_subcmds and not argv[1].startswith("-"):
             return ["weather", "query", *argv[1:]]
     if argv[0] in KNOWN_COMMANDS:
         return argv
-    if argv[0].startswith("-"):
-        return ["prompt", *argv]
-    return ["prompt", *argv]
+    # 裸参数或未知命令路由到 chat
+    return ["chat", *argv]
 
 
 def handle_prompt(args: argparse.Namespace) -> None:
@@ -259,14 +461,332 @@ def handle_weather_query(args: argparse.Namespace) -> None:
 def handle_weather_ask(args: argparse.Namespace) -> None:
     logger.info("开始执行 weather ask 命令。")
     settings = load_settings()
+
+    # 构建回调追踪配置
+    trace_handler = None
+    if args.trace:
+        trace_handler = WeatherTraceHandler(output_file=args.trace_output)
+
     try:
-        answer = answer_weather_question(args.question, settings)
+        if args.stream:
+            stream_weather_agent_answer(args.question, settings)
+        elif args.multi_tool:
+            from langchain.agents import create_agent
+            from .weather_multi_tool import build_multi_tool_agent
+
+            agent = build_multi_tool_agent(settings)
+            config = {"callbacks": [trace_handler]} if trace_handler else {}
+            result = agent.invoke(
+                {"messages": [{"role": "user", "content": args.question}]},
+                config=config,
+            )
+            # 提取回答
+            from .weather_langchain import extract_agent_answer
+            answer = extract_agent_answer(result)
+            print(answer)
+        else:
+            if trace_handler:
+                from langchain.agents import create_agent
+                from .weather_langchain import build_weather_tool
+
+                weather_tool = build_weather_tool(settings)
+                from .openai_support import build_chat_model
+                agent = create_agent(
+                    model=build_chat_model(settings),
+                    tools=[weather_tool],
+                    system_prompt="你是一个天气查询助手。通过 weather_lookup 工具查询真实天气数据来回答用户问题。输出使用中文。",
+                )
+                result = agent.invoke(
+                    {"messages": [{"role": "user", "content": args.question}]},
+                    config={"callbacks": [trace_handler]},
+                )
+                from .weather_langchain import extract_agent_answer
+                answer = extract_agent_answer(result)
+                print(answer)
+            else:
+                answer = answer_weather_question(args.question, settings)
+                print(answer)
     except WeatherError as exc:
         logger.error("%s", exc)
         raise SystemExit(1) from exc
 
-    logger.info("weather ask 命令执行完成，开始输出结果。")
-    print(answer)
+    if trace_handler:
+        print(f"\n--- 追踪摘要: {trace_handler.summary} ---")
+        if args.trace_output:
+            trace_handler.save_trace(args.trace_output)
+            print(f"追踪日志已保存到: {args.trace_output}")
+
+    logger.info("weather ask 命令执行完成。")
+
+
+def handle_weather_summarize(args: argparse.Namespace) -> None:
+    logger.info("开始执行 weather summarize 命令。")
+    settings = load_settings()
+    try:
+        if args.stream:
+            summarize_weather_stream(
+                args.location,
+                settings,
+                style=args.style,
+                adm=args.adm,
+            )
+        else:
+            result = summarize_weather(
+                args.location,
+                settings,
+                style=args.style,
+                adm=args.adm,
+                mode=args.mode,
+            )
+            print(result)
+    except WeatherError as exc:
+        logger.error("%s", exc)
+        raise SystemExit(1) from exc
+    logger.info("weather summarize 命令执行完成。")
+
+
+def handle_weather_summarize_batch(args: argparse.Namespace) -> None:
+    logger.info("开始执行 weather summarize-batch 命令。")
+    settings = load_settings()
+    try:
+        results = summarize_weather_batch(
+            args.locations,
+            settings,
+            style=args.style,
+        )
+    except WeatherError as exc:
+        logger.error("%s", exc)
+        raise SystemExit(1) from exc
+
+    for location, summary in zip(args.locations, results):
+        print(f"--- {location} ---")
+        print(summary)
+    logger.info("weather summarize-batch 命令执行完成。")
+
+
+def handle_weather_advise(args: argparse.Namespace) -> None:
+    logger.info("开始执行 weather advise 命令。")
+    settings = load_settings()
+    try:
+        result = advise_weather(
+            args.location,
+            settings,
+            adm=args.adm,
+            mode=args.mode,
+            output_json=args.output_json,
+        )
+        print(result)
+    except WeatherError as exc:
+        logger.error("%s", exc)
+        raise SystemExit(1) from exc
+    logger.info("weather advise 命令执行完成。")
+
+
+def handle_weather_chat(args: argparse.Namespace) -> None:
+    logger.info("开始执行 weather chat 命令。")
+    settings = load_settings()
+
+    if args.history:
+        session = get_session(args.session)
+        print(f"会话 '{args.session}' 历史记录：")
+        print(format_history(session))
+        return
+
+    print(f"天气对话已启动（会话: {args.session}）")
+    print("输入问题进行天气查询，输入 'quit' 或 'exit' 退出，输入 'history' 查看历史。")
+    print()
+
+    try:
+        while True:
+            try:
+                question = input("你: ").strip()
+            except (EOFError, KeyboardInterrupt):
+                break
+
+            if not question:
+                continue
+            if question.lower() in ("quit", "exit", "q"):
+                break
+            if question.lower() == "history":
+                session = get_session(args.session)
+                print(format_history(session))
+                print()
+                continue
+
+            try:
+                answer = chat_turn(question, settings, session_id=args.session)
+                print(f"\n助手: {answer}\n")
+            except Exception as exc:
+                logger.error("对话出错: %s", exc)
+                print(f"出错: {exc}\n")
+    finally:
+        logger.info("weather chat 命令结束。")
+
+
+def handle_weather_graph(args: argparse.Namespace) -> None:
+    logger.info("开始执行 weather graph 命令。")
+    settings = load_settings()
+
+    if args.repl:
+        print(f"LangGraph 天气工作流已启动（线程: {args.thread}）")
+        print("输入问题进行天气查询，输入 'quit' 或 'exit' 退出。")
+        print()
+        try:
+            while True:
+                try:
+                    question = input("你: ").strip()
+                except (EOFError, KeyboardInterrupt):
+                    break
+                if not question:
+                    continue
+                if question.lower() in ("quit", "exit", "q"):
+                    break
+                try:
+                    answer = answer_weather_graph(
+                        question, settings, thread_id=args.thread
+                    )
+                    print(f"\n助手: {answer}\n")
+                except Exception as exc:
+                    logger.error("工作流出错: %s", exc)
+                    print(f"出错: {exc}\n")
+        finally:
+            logger.info("weather graph REPL 结束。")
+    else:
+        if not args.question:
+            print("请提供天气问题，例如: weather graph 北京天气怎么样")
+            raise SystemExit(1)
+        try:
+            answer = answer_weather_graph(
+                args.question, settings, thread_id=args.thread
+            )
+            print(answer)
+        except Exception as exc:
+            logger.error("工作流出错: %s", exc)
+            raise SystemExit(1) from exc
+
+    logger.info("weather graph 命令执行完成。")
+
+
+def handle_search(args: argparse.Namespace) -> None:
+    logger.info("开始执行 search 命令。")
+    settings = load_settings()
+    try:
+        answer = search_and_answer(args.question, settings)
+        print(answer)
+    except Exception as exc:
+        logger.error("搜索失败: %s", exc)
+        raise SystemExit(1) from exc
+    logger.info("search 命令执行完成。")
+
+
+def handle_doc(args: argparse.Namespace) -> None:
+    logger.info("开始执行 doc 命令。")
+    settings = load_settings()
+    try:
+        answer = answer_document_question(args.file_path, args.question, settings)
+        print(answer)
+    except Exception as exc:
+        logger.error("文档问答失败: %s", exc)
+        raise SystemExit(1) from exc
+    logger.info("doc 命令执行完成。")
+
+
+def handle_analyze(args: argparse.Namespace) -> None:
+    logger.info("开始执行 analyze 命令。")
+    settings = load_settings()
+    try:
+        answer = analyze_csv(args.file_path, args.question, settings)
+        print(answer)
+    except Exception as exc:
+        logger.error("数据分析失败: %s", exc)
+        raise SystemExit(1) from exc
+    logger.info("analyze 命令执行完成。")
+
+
+def handle_translate(args: argparse.Namespace) -> None:
+    logger.info("开始执行 translate 命令。")
+    settings = load_settings()
+    try:
+        result = translate_text(
+            args.text, settings,
+            source_lang=args.source_lang,
+            target_lang=args.target_lang,
+        )
+        print(result)
+    except Exception as exc:
+        logger.error("翻译失败: %s", exc)
+        raise SystemExit(1) from exc
+    logger.info("translate 命令执行完成。")
+
+
+def handle_chat(args: argparse.Namespace) -> None:
+    logger.info("开始执行统一 chat 命令。")
+    settings = load_settings()
+
+    trace_handler = None
+    if args.trace:
+        trace_handler = WeatherTraceHandler(output_file=args.trace_output)
+    config = {"callbacks": [trace_handler]} if trace_handler else {}
+
+    # 单次问答模式
+    if args.question:
+        try:
+            if args.stream:
+                chat_unified_stream(
+                    args.question, settings, session_id=args.session,
+                )
+            else:
+                answer = chat_unified(
+                    args.question, settings,
+                    session_id=args.session, config=config or None,
+                )
+                print(answer)
+        except Exception as exc:
+            logger.error("统一 Agent 出错: %s", exc)
+            raise SystemExit(1) from exc
+
+        if trace_handler:
+            print(f"\n--- 追踪摘要: {trace_handler.summary} ---")
+            if args.trace_output:
+                trace_handler.save_trace(args.trace_output)
+                print(f"追踪日志已保存到: {args.trace_output}")
+        logger.info("统一 chat 单次问答完成。")
+        return
+
+    # 交互 REPL 模式
+    print("统一 Agent 已启动。支持天气查询、知识库检索、闲聊。")
+    print("输入问题开始对话，输入 'quit' 或 'exit' 退出。")
+    print()
+
+    try:
+        while True:
+            try:
+                question = input("你: ").strip()
+            except (EOFError, KeyboardInterrupt):
+                break
+            if not question:
+                continue
+            if question.lower() in ("quit", "exit", "q"):
+                break
+            try:
+                if args.stream:
+                    sys.stdout.write("助手: ")
+                    chat_unified_stream(
+                        question, settings,
+                        session_id=args.session, file=sys.stdout,
+                    )
+                else:
+                    answer = chat_unified(
+                        question, settings,
+                        session_id=args.session,
+                        config=config or None,
+                    )
+                    print(f"\n助手: {answer}\n")
+            except Exception as exc:
+                logger.error("对话出错: %s", exc)
+                print(f"出错: {exc}\n")
+    finally:
+        logger.info("统一 chat REPL 结束。")
 
 
 def main() -> None:
