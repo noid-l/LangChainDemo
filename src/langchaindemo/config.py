@@ -9,8 +9,6 @@ from .logging_utils import get_logger
 DEFAULT_CHAT_MODEL = "gpt-4.1-mini"
 DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
 DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
-DEFAULT_PROXY_URL = "http://127.0.0.1:7890"
-DEFAULT_NO_PROXY = "localhost,127.0.0.1"
 DEFAULT_KNOWLEDGE_DIR = "data/knowledge"
 DEFAULT_VECTOR_STORE_PATH = ".cache/vector_store.json"
 DEFAULT_RAG_TOP_K = 4
@@ -68,46 +66,23 @@ def get_project_root() -> Path:
     return project_root
 
 
-def resolve_proxy_url() -> str:
-    proxy = _read_optional_env(
-        "OPENAI_PROXY",
-        "HTTPS_PROXY",
-        "https_proxy",
-        "HTTP_PROXY",
-        "http_proxy",
-    )
-    resolved = proxy or DEFAULT_PROXY_URL
-    logger.debug("解析代理地址: %s", resolved)
-    return resolved
-
-
-def apply_proxy_defaults(proxy_url: str, no_proxy: str) -> None:
-    os.environ.setdefault("HTTP_PROXY", proxy_url)
-    os.environ.setdefault("HTTPS_PROXY", proxy_url)
-    os.environ.setdefault("NO_PROXY", no_proxy)
-    os.environ.setdefault("OPENAI_PROXY", proxy_url)
-    logger.debug("已应用代理默认值: proxy=%s, no_proxy=%s", proxy_url, no_proxy)
-
-
 @dataclass(frozen=True)
 class Settings:
     project_root: Path
     knowledge_dir: Path
     vector_store_path: Path
+    chat_provider: str  # openai, deepseek 等
     chat_api_key: str | None
     chat_base_url: str | None
     chat_model: str
     embedding_api_key: str | None
     embedding_base_url: str | None
     embedding_model: str
-    proxy_url: str
-    no_proxy: str
     rag_top_k: int
     chunk_size: int
     chunk_overlap: int
     qweather_project_id: str | None
     qweather_key_id: str | None
-    qweather_private_key: str | None
     qweather_private_key_path: str | None
     qweather_api_host: str | None
     qweather_jwt_ttl_seconds: int
@@ -123,10 +98,6 @@ def load_settings() -> Settings:
     vector_store_path = project_root / os.getenv(
         "VECTOR_STORE_PATH", DEFAULT_VECTOR_STORE_PATH
     )
-    proxy_url = resolve_proxy_url()
-    no_proxy = _read_optional_env("NO_PROXY", "no_proxy") or DEFAULT_NO_PROXY
-
-    apply_proxy_defaults(proxy_url=proxy_url, no_proxy=no_proxy)
 
     embedding_api_key = _read_optional_env(
         "OPENAI_EMBEDDING_API_KEY",
@@ -162,10 +133,19 @@ def load_settings() -> Settings:
     if embedding_model is None and not _is_explicitly_blank("OPENAI_EMBEDDING_MODEL"):
         embedding_model = DEFAULT_EMBEDDING_MODEL
 
+    chat_model = _read_optional_env("OPENAI_MODEL", "OPENAI_CHAT_MODEL") or DEFAULT_CHAT_MODEL
+    chat_provider = _read_optional_env("CHAT_PROVIDER")
+    if not chat_provider:
+        if "deepseek" in chat_model.lower():
+            chat_provider = "deepseek"
+        else:
+            chat_provider = "openai"
+
     settings = Settings(
         project_root=project_root,
         knowledge_dir=knowledge_dir,
         vector_store_path=vector_store_path,
+        chat_provider=chat_provider,
         chat_api_key=_read_optional_env(
             "OPENAI_API_KEY",
             "CHAT_API_KEY",
@@ -178,19 +158,15 @@ def load_settings() -> Settings:
             "DEEPSEEK_BASE_URL",
         )
         or DEFAULT_OPENAI_BASE_URL,
-        chat_model=_read_optional_env("OPENAI_MODEL", "OPENAI_CHAT_MODEL")
-        or DEFAULT_CHAT_MODEL,
+        chat_model=chat_model,
         embedding_api_key=embedding_api_key,
         embedding_base_url=embedding_base_url,
         embedding_model=embedding_model,
-        proxy_url=proxy_url,
-        no_proxy=no_proxy,
         rag_top_k=_read_int_env("RAG_TOP_K", DEFAULT_RAG_TOP_K),
         chunk_size=_read_int_env("RAG_CHUNK_SIZE", DEFAULT_CHUNK_SIZE),
         chunk_overlap=_read_int_env("RAG_CHUNK_OVERLAP", DEFAULT_CHUNK_OVERLAP),
         qweather_project_id=_read_optional_env("QWEATHER_PROJECT_ID"),
         qweather_key_id=_read_optional_env("QWEATHER_KEY_ID"),
-        qweather_private_key=_read_optional_env("QWEATHER_PRIVATE_KEY"),
         qweather_private_key_path=_read_optional_env("QWEATHER_PRIVATE_KEY_PATH"),
         qweather_api_host=_normalize_url(
             _read_optional_env("QWEATHER_API_HOST", "QWEATHER_BASE_URL")
@@ -211,7 +187,7 @@ def load_settings() -> Settings:
         "配置加载完成: knowledge_dir=%s, vector_store_path=%s, chat_model=%s, "
         "embedding_model=%s, rag_top_k=%s, chunk_size=%s, chunk_overlap=%s, "
         "chat_api_key=%s, embedding_api_key=%s, qweather_project_id=%s, "
-        "qweather_key_id=%s, qweather_private_key=%s, qweather_private_key_path=%s, "
+        "qweather_key_id=%s, qweather_private_key_path=%s, "
         "qweather_api_host=%s, qweather_jwt_ttl_seconds=%s, "
         "weather_lang=%s, weather_unit=%s, weather_forecast_days=%s",
         settings.knowledge_dir,
@@ -225,7 +201,6 @@ def load_settings() -> Settings:
         "set" if settings.embedding_api_key else "missing",
         "set" if settings.qweather_project_id else "missing",
         "set" if settings.qweather_key_id else "missing",
-        "set" if settings.qweather_private_key else "missing",
         "set" if settings.qweather_private_key_path else "missing",
         settings.qweather_api_host or "missing",
         settings.qweather_jwt_ttl_seconds,

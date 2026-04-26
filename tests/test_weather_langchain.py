@@ -10,7 +10,7 @@ from langchaindemo.weather_langchain import (
     build_weather_tool,
     extract_agent_answer,
 )
-from test_weather import build_settings, build_transport
+from tests.test_weather import build_settings, build_transport
 
 
 class ToolCompatibleFakeChatModel(FakeMessagesListChatModel):

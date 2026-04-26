@@ -30,6 +30,9 @@ def build_private_key_pem() -> str:
 
 def build_settings() -> Settings:
     project_root = Path("/tmp/langchaindemo")
+    project_root.mkdir(parents=True, exist_ok=True)
+    private_key_path = project_root / "qweather-test-private.pem"
+    private_key_path.write_text(build_private_key_pem(), encoding="utf-8")
     return Settings(
         project_root=project_root,
         knowledge_dir=project_root / "data/knowledge",
@@ -40,15 +43,13 @@ def build_settings() -> Settings:
         embedding_api_key="embedding-key",
         embedding_base_url="https://api.openai.com/v1",
         embedding_model="text-embedding-3-small",
-        proxy_url="http://127.0.0.1:7890",
-        no_proxy="localhost,127.0.0.1",
+        chat_provider="openai",
         rag_top_k=4,
         chunk_size=800,
         chunk_overlap=120,
         qweather_project_id="project-123",
         qweather_key_id="kid-123",
-        qweather_private_key=build_private_key_pem(),
-        qweather_private_key_path=None,
+        qweather_private_key_path=str(private_key_path),
         qweather_api_host="https://example.com",
         qweather_jwt_ttl_seconds=900,
         weather_lang="zh",
@@ -277,6 +278,21 @@ class WeatherServiceTests(unittest.TestCase):
             **{
                 **settings.__dict__,
                 "qweather_api_host": "https://devapi.qweather.com",
+            }
+        )
+        with self.assertRaises(WeatherConfigError):
+            query_weather(
+                settings,
+                location="北京",
+                transport=build_transport(),
+            )
+
+    def test_missing_private_key_path_raises_error(self) -> None:
+        settings = build_settings()
+        settings = Settings(
+            **{
+                **settings.__dict__,
+                "qweather_private_key_path": None,
             }
         )
         with self.assertRaises(WeatherConfigError):

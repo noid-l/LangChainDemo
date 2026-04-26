@@ -12,8 +12,10 @@ from .config import Settings
 from .logging_utils import get_logger
 from .openai_support import build_chat_model, ensure_chat_api_key
 from .weather import (
+    AmbiguousLocationError,
     WeatherError,
     ensure_qweather_jwt_config,
+    format_location_summary,
     format_weather_report,
     query_weather,
 )
@@ -78,15 +80,45 @@ def build_weather_tool(
             unit,
             forecast_days,
         )
-        result = query_weather(
-            settings,
-            location=location,
-            adm=adm,
-            lang=lang,
-            unit=unit,
-            forecast_days=forecast_days,
-            transport=transport,
-        )
+        try:
+            result = query_weather(
+                settings,
+                location=location,
+                adm=adm,
+                lang=lang,
+                unit=unit,
+                forecast_days=forecast_days,
+                transport=transport,
+            )
+        except AmbiguousLocationError as exc:
+            # 尝试根据 adm 进行过滤，如果过滤后只有一个结果，则自动选择
+            if adm:
+                filtered = [
+                    c for c in exc.candidates 
+                    if adm in (c.adm1 or "") or adm in (c.adm2 or "")
+                ]
+                if len(filtered) == 1:
+                    # 重新调用，这次结果应该是唯一的
+                    result = query_weather(
+                        settings,
+                        location=location,
+                        adm=filtered[0].adm1, # 使用确定的行政区
+                        lang=lang,
+                        unit=unit,
+                        forecast_days=forecast_days,
+                        transport=transport,
+                    )
+                    return format_weather_report(result)
+
+            candidates_text = "\n".join(
+                f"- {format_location_summary(c)} (请在输入地点时通过 adm 参数或更精确的描述进行区分)"
+                for c in exc.candidates
+            )
+            return (
+                f"查询地点 '{location}' 存在歧义，匹配到了以下多个候选地点，请向用户确认具体位置：\n"
+                f"{candidates_text}"
+            )
+
         return format_weather_report(result)
 
     return StructuredTool.from_function(
@@ -104,6 +136,13 @@ def extract_agent_answer(agent_result: dict[str, object]) -> str:
     messages = agent_result.get("messages")
     if not isinstance(messages, list):
         raise WeatherError("Agent 未返回有效消息列表。")
+
+    # 打印每条 AIMessage 的思考内容
+    for message in messages:
+        if isinstance(message, AIMessage):
+            reasoning = message.additional_kwargs.get("reasoning_content")
+            if reasoning:
+                print(f"[思考] {reasoning}")
 
     for message in reversed(messages):
         if isinstance(message, AIMessage):

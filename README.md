@@ -85,12 +85,6 @@ WEATHER_FORECAST_DAYS=3
 WEATHER_TIMEOUT_SECONDS=10
 ```
 
-如果你确实想把私钥直接写进环境变量，也可以改用：
-
-```bash
-QWEATHER_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
-```
-
 和风官方文档：
 
 - 身份认证：https://dev.qweather.com/docs/configuration/authentication/

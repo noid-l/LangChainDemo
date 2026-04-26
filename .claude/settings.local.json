@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv pip *)",
+      "mcp__web-reader__webReader",
+      "Bash(uv run *)"
+    ]
+  }
+}

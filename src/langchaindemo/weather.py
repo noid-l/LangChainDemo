@@ -118,7 +118,7 @@ def ensure_qweather_jwt_config(settings: Settings) -> None:
         settings.qweather_project_id
         and settings.qweather_key_id
         and settings.qweather_api_host
-        and (settings.qweather_private_key or settings.qweather_private_key_path)
+        and settings.qweather_private_key_path
     ):
         return
 
@@ -129,25 +129,21 @@ def ensure_qweather_jwt_config(settings: Settings) -> None:
         missing_items.append("QWEATHER_KEY_ID")
     if not settings.qweather_api_host:
         missing_items.append("QWEATHER_API_HOST")
-    if not (settings.qweather_private_key or settings.qweather_private_key_path):
-        missing_items.append("QWEATHER_PRIVATE_KEY 或 QWEATHER_PRIVATE_KEY_PATH")
+    if not settings.qweather_private_key_path:
+        missing_items.append("QWEATHER_PRIVATE_KEY_PATH")
 
     logger.error("QWeather JWT 配置缺失: missing=%s", ", ".join(missing_items))
     raise WeatherConfigError(
         "未检测到完整的 QWeather JWT 配置。请在 .env 中配置 "
         "QWEATHER_PROJECT_ID、QWEATHER_KEY_ID、QWEATHER_API_HOST，"
-        "以及 QWEATHER_PRIVATE_KEY 或 QWEATHER_PRIVATE_KEY_PATH。"
+        "以及 QWEATHER_PRIVATE_KEY_PATH。"
     )
 
 
 def resolve_qweather_private_key(settings: Settings) -> str:
-    if settings.qweather_private_key:
-        logger.info("使用环境变量中的 QWeather 私钥内容。")
-        return settings.qweather_private_key
-
     private_key_path = settings.qweather_private_key_path
     if not private_key_path:
-        raise WeatherConfigError("未配置 QWEATHER_PRIVATE_KEY 或 QWEATHER_PRIVATE_KEY_PATH。")
+        raise WeatherConfigError("未配置 QWEATHER_PRIVATE_KEY_PATH。")
 
     resolved_path = Path(private_key_path).expanduser()
     if not resolved_path.is_absolute():
@@ -310,7 +306,6 @@ class WeatherClient:
         bearer_token: str,
         base_url: str,
         timeout_seconds: float,
-        proxy_url: str | None = None,
         transport: httpx.BaseTransport | None = None,
     ) -> None:
         logger.info(
@@ -322,7 +317,6 @@ class WeatherClient:
             base_url=base_url.rstrip("/"),
             headers={"Authorization": f"Bearer {bearer_token}"},
             timeout=timeout_seconds,
-            proxy=proxy_url,
             transport=transport,
         )
 
@@ -576,7 +570,6 @@ def query_weather(
         bearer_token=token,
         base_url=jwt_config.api_host,
         timeout_seconds=settings.weather_timeout_seconds,
-        proxy_url=None if transport is not None else settings.proxy_url,
         transport=transport,
     ) as client:
         service = WeatherService(client, LocationResolver(client))

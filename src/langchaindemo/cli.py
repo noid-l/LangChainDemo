@@ -204,14 +204,13 @@ def handle_config(_args: argparse.Namespace) -> None:
     print(f"project_root={settings.project_root}")
     print(f"knowledge_dir={settings.knowledge_dir}")
     print(f"vector_store_path={settings.vector_store_path}")
+    print(f"chat_provider={settings.chat_provider}")
     print(f"chat_api_key={'set' if settings.chat_api_key else 'missing'}")
     print(f"chat_base_url={settings.chat_base_url}")
     print(f"chat_model={settings.chat_model}")
     print(f"embedding_api_key={'set' if settings.embedding_api_key else 'missing'}")
     print(f"embedding_base_url={settings.embedding_base_url}")
     print(f"embedding_model={settings.embedding_model}")
-    print(f"proxy_url={settings.proxy_url}")
-    print(f"no_proxy={settings.no_proxy}")
     print(f"rag_top_k={settings.rag_top_k}")
     print(f"chunk_size={settings.chunk_size}")
     print(f"chunk_overlap={settings.chunk_overlap}")
@@ -219,9 +218,6 @@ def handle_config(_args: argparse.Namespace) -> None:
         f"qweather_project_id={'set' if settings.qweather_project_id else 'missing'}"
     )
     print(f"qweather_key_id={'set' if settings.qweather_key_id else 'missing'}")
-    print(
-        f"qweather_private_key={'set' if settings.qweather_private_key else 'missing'}"
-    )
     print(
         "qweather_private_key_path="
         f"{settings.qweather_private_key_path or 'missing'}"

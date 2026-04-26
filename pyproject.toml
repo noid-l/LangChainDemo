@@ -12,6 +12,7 @@ dependencies = [
     "httpx>=0.28.1",
     "langchain>=1.2.15",
     "langchain-core>=1.2.30",
+    "langchain-deepseek>=1.0.1",
     "langchain-openai>=1.1.13",
     "numpy>=2.4.4",
     "pyjwt>=2.12.1",
