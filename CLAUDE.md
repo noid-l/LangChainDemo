@@ -31,7 +31,8 @@ uv run python -m unittest discover -s tests -v
 src/langchaindemo/
 ├── cli.py              # CLI 解析 + 调度（~170 行），领域子命令由各包自注册
 ├── config.py           # frozen dataclass Settings，多级回退配置
-├── openai_support.py   # 聊天/Embedding/Vision 模型工厂
+├── providers.py        # 模型提供者注册表（openai/deepseek/qwen），可扩展
+├── openai_support.py   # 兼容 shim，re-export providers.py
 ├── prompting.py        # PromptTemplate 文本生成
 ├── logging_utils.py    # 日志工具
 ├── agent.py            # 统一 Agent 编排器，整合所有工具
@@ -73,7 +74,8 @@ src/langchaindemo/
 
 **基础设施**：
 - **PromptTemplate** — `prompting.py`
-- **ChatOpenAI / Embeddings / Vision** — `openai_support.py`
+- **模型提供者注册表** — `providers.py`：`register_provider()` 可扩展注册，内置 OpenAI / DeepSeek / Qwen 三个提供者
+- **ChatOpenAI / Embeddings / Vision** — `openai_support.py`（re-export shim）
 
 **天气领域**（`weather/`）：
 - **Tool Calling / Agent** — `agent.py`
@@ -109,7 +111,7 @@ CLI → handler（各包 handlers.py）→ service 层 → 外部 API 或 LangCh
 
 ## 环境变量
 
-所有配置通过 `.env` 加载（`python-dotenv`）。模板见 `.env.example`。包括 OpenAI 兼容接口配置（支持 DeepSeek 等）、embedding 独立配置、Vision 模型配置（支持硅基流动等）、和风天气 JWT 凭据、RAG 参数、Tavily 搜索 API Key。
+所有配置通过 `.env` 加载（`python-dotenv`）。模板见 `.env.example`。包括 OpenAI 兼容接口配置（支持 DeepSeek、Qwen 等）、embedding 独立配置、Vision 模型配置（支持硅基流动等）、和风天气 JWT 凭据、RAG 参数、Tavily 搜索 API Key。`CHAT_PROVIDER` 支持自动检测：模型名含 `deepseek` → DeepSeek，含 `qwen`/`qwq` → Qwen，其余 → OpenAI。
 
 ## 语言
 

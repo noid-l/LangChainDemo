@@ -185,8 +185,11 @@ def load_settings() -> Settings:
     chat_model = _read_optional_env("OPENAI_MODEL", "OPENAI_CHAT_MODEL") or DEFAULT_CHAT_MODEL
     chat_provider = _read_optional_env("CHAT_PROVIDER")
     if not chat_provider:
-        if "deepseek" in chat_model.lower():
+        model_lower = chat_model.lower()
+        if "deepseek" in model_lower:
             chat_provider = "deepseek"
+        elif any(kw in model_lower for kw in ("qwen", "qwq")):
+            chat_provider = "qwen"
         else:
             chat_provider = "openai"
 
@@ -199,6 +202,7 @@ def load_settings() -> Settings:
             "OPENAI_API_KEY",
             "CHAT_API_KEY",
             "DEEPSEEK_API_KEY",
+            "DASHSCOPE_API_KEY",
         ),
         chat_base_url=_read_optional_env(
             "OPENAI_API_BASE",

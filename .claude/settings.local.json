@@ -15,7 +15,14 @@
       "WebSearch",
       "mcp__web-search-prime__web_search_prime",
       "Bash(RAG_CHUNK_SIZE=400 RAG_CHUNK_OVERLAP=80 uv run *)",
-      "Bash(git stash *)"
+      "Bash(git stash *)",
+      "Bash(git rm *)",
+      "Bash(pip3 show *)",
+      "Bash(pip3 install *)",
+      "Bash(git filter-repo *)",
+      "Bash(xargs -I{} git ls-tree -r --name-only {})",
+      "Bash(git remote *)",
+      "Bash(echo \"EXIT_CODE=$?\")"
     ]
   }
 }
