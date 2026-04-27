@@ -48,8 +48,14 @@ CLI 入口在 `src/langchaindemo/cli.py`，使用 argparse 子命令组织，通
 - **Callbacks** — `weather_tracing.py`：`BaseCallbackHandler` 框架级可观测性，不修改链代码即可追踪每一步
 - **LangGraph** — `weather_graph.py`：`StateGraph` 显式状态图，条件路由 + `InMemorySaver` 检查点持久化
 - **天气服务** — `weather.py`：纯确定性实现，包含 JWT 鉴权、地点解析、API 调用，不依赖 LangChain
+- **FewShot Prompt** — `translate.py`：`FewShotChatMessagePromptTemplate` 翻译示例 + 术语表，`Runnable.batch()` 批量翻译
+- **Document Loaders** — `document_qa.py`：PDF（PyPDF）/ Word（python-docx）/ TXT 多格式加载 → 切分 → 向量检索 → 问答
+- **Web Search** — `web_search.py`：Tavily 搜索 API 集成，搜索结果摘要链（LCEL）
+- **Code Generation** — `data_analysis.py`：LLM 生成 pandas 代码 → 受限执行（`__builtins__` 为空），自然语言 → 代码 → 结果
+- **统一 Agent** — `unified_agent.py`：超级 Agent REPL，整合所有工具（天气 ×3、知识库、搜索、翻译、文档问答、数据分析），`InMemoryChatMessageHistory` 多轮会话
+- **MarkItDown** — `markitdown_tool.py`：Microsoft MarkItDown 统一文件转换（PDF/Word/Excel/PPT/图片/HTML 等 20+ 格式 → Markdown），封装为 StructuredTool，支持 RAG 问答
 
-数据流：CLI → handler → service 层（weather / rag）→ 外部 API 或 LangChain chain。
+数据流：CLI → handler → service 层（weather / rag / web_search / document_qa / data_analysis / translate / markitdown_tool）→ 外部 API 或 LangChain chain。统一入口 `chat` 命令通过 Agent 自动路由到对应工具。
 
 ## 测试约定
 
@@ -57,7 +63,7 @@ CLI 入口在 `src/langchaindemo/cli.py`，使用 argparse 子命令组织，通
 
 ## 环境变量
 
-所有配置通过 `.env` 加载（`python-dotenv`）。模板见 `.env.example`。包括 OpenAI 兼容接口配置（支持 DeepSeek 等）、embedding 独立配置、和风天气 JWT 凭据、RAG 参数。
+所有配置通过 `.env` 加载（`python-dotenv`）。模板见 `.env.example`。包括 OpenAI 兼容接口配置（支持 DeepSeek 等）、embedding 独立配置、和风天气 JWT 凭据、RAG 参数、Tavily 搜索 API Key（`TAVILY_API_KEY`）。
 
 ## 语言
 

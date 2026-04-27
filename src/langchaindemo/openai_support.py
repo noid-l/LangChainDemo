@@ -83,6 +83,17 @@ def ensure_embedding_api_key(settings: Settings) -> None:
     )
 
 
+def ensure_vision_api_key(settings: Settings) -> None:
+    if settings.vision_api_key:
+        return
+
+    logger.error("Vision API Key 缺失。")
+    raise SystemExit(
+        "未检测到 Vision API Key。请先在 .env 中填写 "
+        "VISION_API_KEY，或沿用 OPENAI_API_KEY。"
+    )
+
+
 def build_chat_model(settings: Settings) -> ChatOpenAI | ChatDeepSeekAdapter:
     ensure_chat_api_key(settings)
     logger.info(
@@ -119,4 +130,19 @@ def build_embeddings(settings: Settings) -> OpenAIEmbeddings:
         api_key=settings.embedding_api_key,
         base_url=settings.embedding_base_url,
         model=settings.embedding_model,
+    )
+
+
+def build_vision_model(settings: Settings) -> ChatOpenAI:
+    ensure_vision_api_key(settings)
+    logger.info(
+        "构建 Vision 客户端: model=%s, base_url=%s",
+        settings.vision_model,
+        settings.vision_base_url,
+    )
+    return ChatOpenAI(
+        api_key=settings.vision_api_key,
+        base_url=settings.vision_base_url,
+        model=settings.vision_model,
+        temperature=0,
     )

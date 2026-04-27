@@ -8,12 +8,14 @@ from .logging_utils import get_logger
 
 DEFAULT_CHAT_MODEL = "gpt-4.1-mini"
 DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
+DEFAULT_VISION_MODEL = "zai-org/GLM-4.6V"
+DEFAULT_VISION_BASE_URL = "https://api.siliconflow.cn/v1"
 DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
 DEFAULT_KNOWLEDGE_DIR = "data/knowledge"
 DEFAULT_VECTOR_STORE_PATH = ".cache/vector_store.json"
 DEFAULT_RAG_TOP_K = 4
-DEFAULT_CHUNK_SIZE = 800
-DEFAULT_CHUNK_OVERLAP = 120
+DEFAULT_CHUNK_SIZE = 400
+DEFAULT_CHUNK_OVERLAP = 80
 DEFAULT_QWEATHER_JWT_TTL_SECONDS = 900
 DEFAULT_WEATHER_LANG = "zh"
 DEFAULT_WEATHER_UNIT = "m"
@@ -78,6 +80,9 @@ class Settings:
     embedding_api_key: str | None
     embedding_base_url: str | None
     embedding_model: str
+    vision_api_key: str | None
+    vision_base_url: str | None
+    vision_model: str
     rag_top_k: int
     chunk_size: int
     chunk_overlap: int
@@ -133,6 +138,50 @@ def load_settings() -> Settings:
     if embedding_model is None and not _is_explicitly_blank("OPENAI_EMBEDDING_MODEL"):
         embedding_model = DEFAULT_EMBEDDING_MODEL
 
+    # 视觉模型配置：独立 key → 回退到 chat key
+    vision_api_key = _read_optional_env(
+        "VISION_API_KEY",
+        "OPENAI_VISION_API_KEY",
+    )
+    if vision_api_key is None and not _is_explicitly_blank(
+        "VISION_API_KEY",
+        "OPENAI_VISION_API_KEY",
+    ):
+        vision_api_key = _read_optional_env(
+            "OPENAI_API_KEY",
+            "CHAT_API_KEY",
+            "DEEPSEEK_API_KEY",
+        )
+
+    vision_base_url = _read_optional_env(
+        "VISION_BASE_URL",
+        "OPENAI_VISION_API_BASE",
+        "OPENAI_VISION_BASE_URL",
+    )
+    if vision_base_url is None and not _is_explicitly_blank(
+        "VISION_BASE_URL",
+        "OPENAI_VISION_API_BASE",
+        "OPENAI_VISION_BASE_URL",
+    ):
+        vision_base_url = None  # 使用下面的默认值逻辑
+
+    if vision_base_url is None:
+        # 如果有独立的 vision key，说明用户想用专门的视觉平台（如硅基流动）
+        # 此时使用默认视觉平台 URL；否则回退到 chat base_url
+        if _read_optional_env("VISION_API_KEY", "OPENAI_VISION_API_KEY"):
+            vision_base_url = DEFAULT_VISION_BASE_URL
+        else:
+            vision_base_url = _read_optional_env(
+                "OPENAI_API_BASE",
+                "OPENAI_BASE_URL",
+                "CHAT_BASE_URL",
+                "DEEPSEEK_BASE_URL",
+            ) or DEFAULT_OPENAI_BASE_URL
+
+    vision_model = _read_optional_env("VISION_MODEL")
+    if vision_model is None and not _is_explicitly_blank("VISION_MODEL"):
+        vision_model = DEFAULT_VISION_MODEL
+
     chat_model = _read_optional_env("OPENAI_MODEL", "OPENAI_CHAT_MODEL") or DEFAULT_CHAT_MODEL
     chat_provider = _read_optional_env("CHAT_PROVIDER")
     if not chat_provider:
@@ -162,6 +211,9 @@ def load_settings() -> Settings:
         embedding_api_key=embedding_api_key,
         embedding_base_url=embedding_base_url,
         embedding_model=embedding_model,
+        vision_api_key=vision_api_key,
+        vision_base_url=vision_base_url,
+        vision_model=vision_model,
         rag_top_k=_read_int_env("RAG_TOP_K", DEFAULT_RAG_TOP_K),
         chunk_size=_read_int_env("RAG_CHUNK_SIZE", DEFAULT_CHUNK_SIZE),
         chunk_overlap=_read_int_env("RAG_CHUNK_OVERLAP", DEFAULT_CHUNK_OVERLAP),
@@ -185,8 +237,8 @@ def load_settings() -> Settings:
     )
     logger.info(
         "配置加载完成: knowledge_dir=%s, vector_store_path=%s, chat_model=%s, "
-        "embedding_model=%s, rag_top_k=%s, chunk_size=%s, chunk_overlap=%s, "
-        "chat_api_key=%s, embedding_api_key=%s, qweather_project_id=%s, "
+        "embedding_model=%s, vision_model=%s, rag_top_k=%s, chunk_size=%s, chunk_overlap=%s, "
+        "chat_api_key=%s, embedding_api_key=%s, vision_api_key=%s, qweather_project_id=%s, "
         "qweather_key_id=%s, qweather_private_key_path=%s, "
         "qweather_api_host=%s, qweather_jwt_ttl_seconds=%s, "
         "weather_lang=%s, weather_unit=%s, weather_forecast_days=%s",
@@ -194,11 +246,13 @@ def load_settings() -> Settings:
         settings.vector_store_path,
         settings.chat_model,
         settings.embedding_model,
+        settings.vision_model,
         settings.rag_top_k,
         settings.chunk_size,
         settings.chunk_overlap,
         "set" if settings.chat_api_key else "missing",
         "set" if settings.embedding_api_key else "missing",
+        "set" if settings.vision_api_key else "missing",
         "set" if settings.qweather_project_id else "missing",
         "set" if settings.qweather_key_id else "missing",
         "set" if settings.qweather_private_key_path else "missing",

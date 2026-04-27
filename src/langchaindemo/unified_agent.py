@@ -116,6 +116,15 @@ def build_all_tools(settings: Settings) -> list[StructuredTool]:
     except Exception:
         logger.warning("数据分析工具加载跳过。")
 
+    # MarkItDown 文档转换/问答工具
+    try:
+        from .markitdown_tool import build_convert_tool, build_markitdown_qa_tool
+        tools.append(build_convert_tool(settings))
+        tools.append(build_markitdown_qa_tool(settings))
+        logger.info("MarkItDown 工具已加载。")
+    except Exception:
+        logger.warning("MarkItDown 工具加载跳过。")
+
     logger.info("统一 Agent 工具列表: %s", [t.name for t in tools])
     return tools
 
@@ -131,14 +140,18 @@ UNIFIED_SYSTEM_PROMPT = "\n".join([
     "6. translate — 翻译文本到指定语言",
     "7. document_qa — 读取文档文件（PDF/Word/TXT）并回答问题",
     "8. data_analysis — 分析 CSV 数据文件",
+    "9. markitdown_convert — 将文件转换为 Markdown（支持 20+ 格式）",
+    "10. markitdown_qa — 读取多种格式文件并回答问题",
     "",
     "请根据用户的问题选择合适的工具：",
     "- 天气相关 → weather_lookup / weather_compare / clothing_advisor",
     "- 技术概念、知识库 → knowledge_search",
     "- 实时信息、最新新闻 → web_search",
     "- 翻译 → translate",
-    "- 文档问题（提到文件路径）→ document_qa",
+    "- 文档问题（提到文件路径）→ document_qa 或 markitdown_qa",
     "- 数据分析（提到 CSV/数据）→ data_analysis",
+    "- 文件格式转换/查看文件内容 → markitdown_convert",
+    "- PPT/Excel/图片等 document_qa 不支持的格式 → markitdown_qa",
     "- 闲聊或通用问题 → 直接回答",
     "",
     "如果用户没有明确地点但问天气，可追问。多轮对话中结合上下文推断。",

@@ -32,9 +32,10 @@ from .web_search import search_and_answer
 from .document_qa import answer_document_question
 from .data_analysis import analyze_csv
 from .translate import translate_text, translate_batch
+from .markitdown_tool import convert_to_markdown, answer_with_markitdown
 
 
-KNOWN_COMMANDS = {"chat", "prompt", "rag", "config", "weather", "search", "doc", "analyze", "translate"}
+KNOWN_COMMANDS = {"chat", "prompt", "rag", "config", "weather", "search", "doc", "analyze", "translate", "convert"}
 logger = get_logger(__name__)
 
 
@@ -325,6 +326,16 @@ def build_parser() -> argparse.ArgumentParser:
 
     config_parser = subparsers.add_parser("config", help="查看当前有效配置")
     config_parser.set_defaults(handler=handle_config)
+
+    convert_parser = subparsers.add_parser(
+        "convert", help="文件格式转换（演示 MarkItDown 工具集成）"
+    )
+    convert_parser.add_argument("file_path", help="要转换的文件路径")
+    convert_parser.add_argument(
+        "--question", default=None,
+        help="转换后对文档提问（不提供则仅输出 Markdown）",
+    )
+    convert_parser.set_defaults(handler=handle_convert)
     return parser
 
 
@@ -717,6 +728,22 @@ def handle_translate(args: argparse.Namespace) -> None:
         logger.error("翻译失败: %s", exc)
         raise SystemExit(1) from exc
     logger.info("translate 命令执行完成。")
+
+
+def handle_convert(args: argparse.Namespace) -> None:
+    logger.info("开始执行 convert 命令。")
+    settings = load_settings()
+    try:
+        if args.question:
+            answer = answer_with_markitdown(args.file_path, args.question, settings)
+            print(answer)
+        else:
+            markdown = convert_to_markdown(args.file_path, settings=settings)
+            print(markdown)
+    except Exception as exc:
+        logger.error("文档转换失败: %s", exc)
+        raise SystemExit(1) from exc
+    logger.info("convert 命令执行完成。")
 
 
 def handle_chat(args: argparse.Namespace) -> None:
