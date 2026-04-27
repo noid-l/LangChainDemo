@@ -19,10 +19,10 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable
 
-from .config import Settings
-from .logging_utils import get_logger
-from .openai_support import build_chat_model, ensure_chat_api_key
-from .weather import WeatherQueryResult, format_weather_report, query_weather
+from ..config import Settings
+from ..logging_utils import get_logger
+from ..openai_support import build_chat_model, ensure_chat_api_key
+from .service import WeatherQueryResult, format_weather_report, query_weather
 
 logger = get_logger(__name__)
 

@@ -20,9 +20,9 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 
-from .config import Settings
-from .logging_utils import get_logger
-from .openai_support import build_chat_model, ensure_chat_api_key
+from ..config import Settings
+from ..logging_utils import get_logger
+from ..openai_support import build_chat_model, ensure_chat_api_key
 
 logger = get_logger(__name__)
 

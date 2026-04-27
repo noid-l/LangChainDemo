@@ -25,7 +25,7 @@ from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.messages import BaseMessage
 from langchain_core.outputs import LLMResult
 
-from .logging_utils import get_logger
+from ..logging_utils import get_logger
 
 logger = get_logger(__name__)
 

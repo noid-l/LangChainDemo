@@ -5,12 +5,12 @@ import unittest
 from langchain_core.language_models.fake_chat_models import FakeMessagesListChatModel
 from langchain_core.messages import AIMessage
 
-from langchaindemo.weather_langchain import (
+from langchaindemo.weather.agent import (
     answer_weather_question,
     build_weather_tool,
     extract_agent_answer,
 )
-from tests.test_weather import build_settings, build_transport
+from tests.conftest import build_settings, build_transport
 
 
 class ToolCompatibleFakeChatModel(FakeMessagesListChatModel):

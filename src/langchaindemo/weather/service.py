@@ -9,8 +9,8 @@ from time import perf_counter
 import httpx
 import jwt
 
-from .config import Settings
-from .logging_utils import get_logger
+from ..config import Settings
+from ..logging_utils import get_logger
 
 
 logger = get_logger(__name__)

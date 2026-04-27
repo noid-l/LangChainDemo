@@ -18,11 +18,11 @@ from __future__ import annotations
 from langchain_core.chat_history import InMemoryChatMessageHistory
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 
-from .config import Settings
-from .logging_utils import get_logger
-from .openai_support import build_chat_model, ensure_chat_api_key
-from .weather import ensure_qweather_jwt_config
-from .weather_langchain import build_weather_tool
+from ..config import Settings
+from ..logging_utils import get_logger
+from ..openai_support import build_chat_model, ensure_chat_api_key
+from .agent import build_weather_tool
+from .service import ensure_qweather_jwt_config
 
 logger = get_logger(__name__)
 

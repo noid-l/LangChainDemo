@@ -27,16 +27,16 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from typing_extensions import TypedDict
 
-from .config import Settings
-from .logging_utils import get_logger
-from .openai_support import build_chat_model, ensure_chat_api_key
-from .weather import (
+from ..config import Settings
+from ..logging_utils import get_logger
+from ..openai_support import build_chat_model, ensure_chat_api_key
+from .service import (
     WeatherError,
     ensure_qweather_jwt_config,
     format_location_summary,
     query_weather,
 )
-from .weather_structured import _format_advice, deterministic_advice
+from .structured import _format_advice, deterministic_advice
 
 logger = get_logger(__name__)
 
@@ -107,12 +107,12 @@ def weather_query_node(state: WeatherGraphState) -> dict:
     logger.info("天气查询节点: location=%s", location)
 
     # 需要 settings，这里通过 import 延迟获取
-    from .config import load_settings
+    from ..config import load_settings
     settings = load_settings()
 
     try:
         result = query_weather(settings, location=location)
-        from .weather import format_weather_report
+        from .service import format_weather_report
         tool_result = format_weather_report(result)
     except WeatherError as exc:
         tool_result = f"查询失败: {exc}"
@@ -141,7 +141,7 @@ def weather_compare_node(state: WeatherGraphState) -> dict:
 
     logger.info("天气对比节点: %s vs %s", city1, city2)
 
-    from .config import load_settings
+    from ..config import load_settings
     settings = load_settings()
 
     try:
@@ -175,7 +175,7 @@ def clothing_advise_node(state: WeatherGraphState) -> dict:
     location = _extract_location(user_message)
     logger.info("穿衣建议节点: location=%s", location)
 
-    from .config import load_settings
+    from ..config import load_settings
     settings = load_settings()
 
     try:

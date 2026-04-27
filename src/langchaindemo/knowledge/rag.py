@@ -9,16 +9,16 @@ from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.vectorstores import InMemoryVectorStore
 
-from .config import Settings
-from .knowledge import ChunkingOptions, load_knowledge_documents, split_documents
-from .logging_utils import get_logger
-from .openai_support import (
+from ..config import Settings
+from .loader import ChunkingOptions, load_knowledge_documents, split_documents
+from ..logging_utils import get_logger
+from ..openai_support import (
     build_chat_model,
     build_embeddings,
     ensure_chat_api_key,
     ensure_embedding_api_key,
 )
-from .prompting import build_rag_prompt, format_documents
+from ..prompting import build_rag_prompt, format_documents
 
 logger = get_logger(__name__)
 
@@ -108,7 +108,7 @@ def answer_question(
     embedding_client_started_at = perf_counter()
     embeddings = build_embeddings(settings)
     logger.info(
-        "Embedding 客户端初始化完成，耗时 %.0f ms", 
+        "Embedding 客户端初始化完成，耗时 %.0f ms",
         (perf_counter() - embedding_client_started_at) * 1000,
     )
 
@@ -118,7 +118,7 @@ def answer_question(
         embedding=embeddings,
     )
     logger.info(
-        "向量索引加载完成，耗时 %.0f ms", 
+        "向量索引加载完成，耗时 %.0f ms",
         (perf_counter() - vector_store_load_started_at) * 1000,
     )
 
@@ -223,6 +223,6 @@ def tokenize(text: str) -> list[str]:
     cleaned = text.lower()
     return [
         part
-        for part in re.split(r"[^0-9a-zA-Z\u4e00-\u9fff]+", cleaned)
+        for part in re.split(r"[^0-9a-zA-Z一-鿿]+", cleaned)
         if part
     ]

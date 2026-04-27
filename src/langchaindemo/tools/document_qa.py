@@ -22,9 +22,9 @@ from langchain_core.tools import StructuredTool
 from langchain_core.vectorstores import InMemoryVectorStore
 from pydantic import BaseModel, Field
 
-from .config import Settings
-from .logging_utils import get_logger
-from .openai_support import build_chat_model, build_embeddings, ensure_chat_api_key, ensure_embedding_api_key
+from ..config import Settings
+from ..logging_utils import get_logger
+from ..openai_support import build_chat_model, build_embeddings, ensure_chat_api_key, ensure_embedding_api_key
 
 logger = get_logger(__name__)
 

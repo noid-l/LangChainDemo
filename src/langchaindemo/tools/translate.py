@@ -17,9 +17,9 @@ from langchain_core.prompts import FewShotChatMessagePromptTemplate, ChatPromptT
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 
-from .config import Settings
-from .logging_utils import get_logger
-from .openai_support import build_chat_model, ensure_chat_api_key
+from ..config import Settings
+from ..logging_utils import get_logger
+from ..openai_support import build_chat_model, ensure_chat_api_key
 
 logger = get_logger(__name__)
 
@@ -117,7 +117,6 @@ def translate_batch(
 
 def build_translate_tool(settings: Settings) -> StructuredTool:
     """构建翻译工具（供 Agent 使用）。"""
-
 
     class TranslateInput(BaseModel):
         text: str = Field(description="要翻译的文本")

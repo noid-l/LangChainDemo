@@ -40,7 +40,7 @@ class KnowledgeSearchInput(BaseModel):
 
 def _build_knowledge_search_tool(settings: Settings) -> StructuredTool:
     """构建知识库检索工具。"""
-    from .rag import answer_question
+    from .knowledge.rag import answer_question
 
     def knowledge_search(question: str) -> str:
         logger.info("knowledge_search 工具被调用: question=%s", question[:100])
@@ -72,10 +72,11 @@ def build_all_tools(settings: Settings) -> list[StructuredTool]:
     # 天气相关工具（需要 JWT 配置）
     try:
         from .weather import ensure_qweather_jwt_config
+
         ensure_qweather_jwt_config(settings)
 
-        from .weather_langchain import build_weather_tool
-        from .weather_multi_tool import _build_compare_tool, _build_clothing_advisor_tool
+        from .weather.agent import build_weather_tool
+        from .weather.multi_tool import _build_compare_tool, _build_clothing_advisor_tool
 
         tools.append(build_weather_tool(settings))
         tools.append(_build_compare_tool(settings))
@@ -86,7 +87,7 @@ def build_all_tools(settings: Settings) -> list[StructuredTool]:
 
     # 网页搜索工具（需要 TAVILY_API_KEY）
     try:
-        from .web_search import build_web_search_tool
+        from .tools.web_search import build_web_search_tool
         tools.append(build_web_search_tool(settings))
         logger.info("搜索工具已加载。")
     except Exception:
@@ -94,7 +95,7 @@ def build_all_tools(settings: Settings) -> list[StructuredTool]:
 
     # 翻译工具
     try:
-        from .translate import build_translate_tool
+        from .tools.translate import build_translate_tool
         tools.append(build_translate_tool(settings))
         logger.info("翻译工具已加载。")
     except Exception:
@@ -102,7 +103,7 @@ def build_all_tools(settings: Settings) -> list[StructuredTool]:
 
     # 文档问答工具
     try:
-        from .document_qa import build_document_qa_tool
+        from .tools.document_qa import build_document_qa_tool
         tools.append(build_document_qa_tool(settings))
         logger.info("文档问答工具已加载。")
     except Exception:
@@ -110,7 +111,7 @@ def build_all_tools(settings: Settings) -> list[StructuredTool]:
 
     # 数据分析工具
     try:
-        from .data_analysis import build_data_analysis_tool
+        from .tools.data_analysis import build_data_analysis_tool
         tools.append(build_data_analysis_tool(settings))
         logger.info("数据分析工具已加载。")
     except Exception:
@@ -118,7 +119,7 @@ def build_all_tools(settings: Settings) -> list[StructuredTool]:
 
     # MarkItDown 文档转换/问答工具
     try:
-        from .markitdown_tool import build_convert_tool, build_markitdown_qa_tool
+        from .tools.markitdown import build_convert_tool, build_markitdown_qa_tool
         tools.append(build_convert_tool(settings))
         tools.append(build_markitdown_qa_tool(settings))
         logger.info("MarkItDown 工具已加载。")

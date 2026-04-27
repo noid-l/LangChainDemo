@@ -8,10 +8,10 @@ from langchain_core.messages import AIMessage, BaseMessage
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 
-from .config import Settings
-from .logging_utils import get_logger
-from .openai_support import build_chat_model, ensure_chat_api_key
-from .weather import (
+from ..config import Settings
+from ..logging_utils import get_logger
+from ..openai_support import build_chat_model, ensure_chat_api_key
+from .service import (
     AmbiguousLocationError,
     WeatherError,
     ensure_qweather_jwt_config,
@@ -94,7 +94,7 @@ def build_weather_tool(
             # 尝试根据 adm 进行过滤，如果过滤后只有一个结果，则自动选择
             if adm:
                 filtered = [
-                    c for c in exc.candidates 
+                    c for c in exc.candidates
                     if adm in (c.adm1 or "") or adm in (c.adm2 or "")
                 ]
                 if len(filtered) == 1:

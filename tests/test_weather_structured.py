@@ -7,13 +7,13 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from langchaindemo.weather import query_weather
-from langchaindemo.weather_structured import (
+from langchaindemo.weather.structured import (
     ClothingAdvice,
     _format_advice,
     deterministic_advice,
 )
 
-from tests.test_weather import build_settings, build_transport
+from tests.conftest import build_settings, build_transport
 
 
 class DeterministicAdviceTests(unittest.TestCase):

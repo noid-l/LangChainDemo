@@ -6,7 +6,7 @@ from pathlib import Path
 
 from langchain_core.documents import Document
 
-from .logging_utils import get_logger
+from ..logging_utils import get_logger
 
 SUPPORTED_EXTENSIONS = {".md", ".txt"}
 

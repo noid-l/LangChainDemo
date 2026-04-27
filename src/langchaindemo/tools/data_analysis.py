@@ -25,9 +25,9 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 
-from .config import Settings
-from .logging_utils import get_logger
-from .openai_support import build_chat_model, ensure_chat_api_key
+from ..config import Settings
+from ..logging_utils import get_logger
+from ..openai_support import build_chat_model, ensure_chat_api_key
 
 logger = get_logger(__name__)
 
@@ -46,7 +46,6 @@ def _run_pandas_code(code: str, df: pd.DataFrame) -> str:
     local_vars: dict = {"df": df, "pd": pd}
 
     try:
-        # noqa: S102 - 受限环境，仅允许 pandas 操作
         exec(code, safe_globals, local_vars)  # noqa: S102
     except Exception:
         return f"执行出错:\n{traceback.format_exc()}"

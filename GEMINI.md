@@ -21,49 +21,95 @@ uv run python -m pytest tests/
 # 运行单个测试文件
 uv run python -m pytest tests/test_weather.py
 
-# 运行单个测试方法
-uv run python -m pytest tests/test_weather.py::WeatherServiceTests::test_query_weather_by_city
-
 # 也可以用 unittest 运行
-uv run python -m unittest tests/test_weather.py
+uv run python -m unittest discover -s tests -v
 ```
 
 ## 架构概览
 
-CLI 入口在 `src/langchaindemo/cli.py`，使用 argparse 子命令组织，通过 `normalize_argv` 兼容旧式裸参数调用。所有子命令的 handler 函数在同一个文件中。
+```
+src/langchaindemo/
+├── cli.py              # CLI 解析 + 调度（~170 行），领域子命令由各包自注册
+├── config.py           # frozen dataclass Settings，多级回退配置
+├── openai_support.py   # 聊天/Embedding/Vision 模型工厂
+├── prompting.py        # PromptTemplate 文本生成
+├── logging_utils.py    # 日志工具
+├── agent.py            # 统一 Agent 编排器，整合所有工具
+│
+├── weather/            # 天气领域包
+│   ├── service.py      # 核心 API（JWT 鉴权、地点解析、API 调用）
+│   ├── agent.py        # Tool Calling / Agent
+│   ├── chain.py        # LCEL / Runnable
+│   ├── structured.py   # Structured Output
+│   ├── streaming.py    # Streaming
+│   ├── memory.py       # Memory
+│   ├── multi_tool.py   # Multi-Tool Agent
+│   ├── graph.py        # LangGraph StateGraph
+│   ├── tracing.py      # Callbacks
+│   └── handlers.py     # CLI handler + register_handlers()
+│
+├── knowledge/          # RAG 领域包
+│   ├── loader.py       # 文档加载/切分
+│   ├── rag.py          # 索引构建/检索/问答
+│   └── handlers.py     # CLI handler + register_handlers()
+│
+└── tools/              # 独立工具包
+    ├── web_search.py   # Tavily 搜索
+    ├── document_qa.py  # PDF/Word/TXT 问答
+    ├── data_analysis.py # CSV 数据分析
+    ├── translate.py    # FewShot 翻译
+    ├── markitdown.py   # MarkItDown 文件转换 + OCR
+    └── handlers.py     # CLI handler + register_handlers()
+```
 
-配置系统在 `config.py`，用 frozen dataclass `Settings` 统一管理所有环境变量，支持多级回退（如 embedding key 回退到 chat key）。`project_root` 通过 `Path(__file__).parents[2]` 解析。
+### 扩展新领域
 
-模块与 LangChain 概念的对应关系：
+每个领域包通过 `register_handlers(subparsers)` 自注册 CLI 子命令。新增领域只需：
+1. 创建新包（含 `__init__.py`、模块、`handlers.py`）
+2. 在 `cli.py` 的 `build_parser()` 中加一行 `from .new_domain import register_handlers; register_handlers(subparsers)`
+3. 在 `agent.py` 的 `build_all_tools()` 中加一个 try/except 加载工具
 
-- **PromptTemplate** — `prompting.py`：`PromptTemplate` 文本生成 + `ChatPromptTemplate` RAG 提示词
-- **ChatOpenAI** — `openai_support.py`：聊天模型与 embeddings 工厂，统一通过 `langchain-openai` 接入
-- **RAG** — `knowledge.py`（文档加载/切分）+ `rag.py`（索引构建/检索/问答）：使用 `InMemoryVectorStore`，支持持久化到 JSON
-- **Tool Calling / Agent** — `weather_langchain.py`：将天气查询封装为 `StructuredTool`，通过 `create_agent` 构建 Agent，用 `FakeMessagesListChatModel` 做测试
-- **LCEL / Runnable** — `weather_chain.py`：`prompt | model | StrOutputParser()` 管道链，演示 invoke/stream/batch 三种调用方式
-- **Streaming** — `weather_streaming.py`：Agent 流式输出，`stream_mode="messages"` 逐 token 生成
-- **Structured Output** — `weather_structured.py`：`with_structured_output(PydanticModel)` 让 LLM 返回结构化数据，对比确定性阈值逻辑
-- **Memory** — `weather_memory.py`：`InMemoryChatMessageHistory` 多轮对话上下文管理，演示 Agent 无状态 vs 调用方管理记忆
-- **Multi-Tool Agent** — `weather_multi_tool.py`：多工具选择推理，天气查询/对比/穿衣建议三个工具
-- **Callbacks** — `weather_tracing.py`：`BaseCallbackHandler` 框架级可观测性，不修改链代码即可追踪每一步
-- **LangGraph** — `weather_graph.py`：`StateGraph` 显式状态图，条件路由 + `InMemorySaver` 检查点持久化
-- **天气服务** — `weather.py`：纯确定性实现，包含 JWT 鉴权、地点解析、API 调用，不依赖 LangChain
-- **FewShot Prompt** — `translate.py`：`FewShotChatMessagePromptTemplate` 翻译示例 + 术语表，`Runnable.batch()` 批量翻译
-- **Document Loaders** — `document_qa.py`：PDF（PyPDF）/ Word（python-docx）/ TXT 多格式加载 → 切分 → 向量检索 → 问答
-- **Web Search** — `web_search.py`：Tavily 搜索 API 集成，搜索结果摘要链（LCEL）
-- **Code Generation** — `data_analysis.py`：LLM 生成 pandas 代码 → 受限执行（`__builtins__` 为空），自然语言 → 代码 → 结果
-- **统一 Agent** — `unified_agent.py`：超级 Agent REPL，整合所有工具（天气 ×3、知识库、搜索、翻译、文档问答、数据分析），`InMemoryChatMessageHistory` 多轮会话
-- **MarkItDown** — `markitdown_tool.py`：Microsoft MarkItDown 统一文件转换（PDF/Word/Excel/PPT/图片/HTML 等 20+ 格式 → Markdown），封装为 StructuredTool，支持 RAG 问答
+### 模块与 LangChain 概念对应
 
-数据流：CLI → handler → service 层（weather / rag / web_search / document_qa / data_analysis / translate / markitdown_tool）→ 外部 API 或 LangChain chain。统一入口 `chat` 命令通过 Agent 自动路由到对应工具。
+**基础设施**：
+- **PromptTemplate** — `prompting.py`
+- **ChatOpenAI / Embeddings / Vision** — `openai_support.py`
+
+**天气领域**（`weather/`）：
+- **Tool Calling / Agent** — `agent.py`
+- **LCEL / Runnable** — `chain.py`
+- **Streaming** — `streaming.py`
+- **Structured Output** — `structured.py`
+- **Memory** — `memory.py`
+- **Multi-Tool Agent** — `multi_tool.py`
+- **Callbacks** — `tracing.py`
+- **LangGraph** — `graph.py`
+- **确定性实现** — `service.py`（不依赖 LangChain）
+
+**RAG 领域**（`knowledge/`）：
+- **Document Loaders** — `loader.py`
+- **RAG** — `rag.py`：InMemoryVectorStore，持久化到 JSON
+
+**工具领域**（`tools/`）：
+- **FewShot Prompt** — `translate.py`
+- **Document Loaders** — `document_qa.py`
+- **Web Search** — `web_search.py`
+- **Code Generation** — `data_analysis.py`
+- **MarkItDown + Vision OCR** — `markitdown.py`
+
+**统一 Agent** — `agent.py`：整合所有工具，InMemoryChatMessageHistory 多轮会话
+
+### 数据流
+
+CLI → handler（各包 handlers.py）→ service 层 → 外部 API 或 LangChain chain。`chat` 命令通过 Agent 自动路由到对应工具。
 
 ## 测试约定
 
-测试位于 `tests/`，使用 `unittest`。天气相关测试通过 `httpx.MockTransport` mock HTTP 层，LangChain Agent 测试通过 `FakeMessagesListChatModel` mock 模型层。`test_weather_langchain.py` 从 `test_weather.py` 导入 `build_settings` 和 `build_transport` 复用 fixture。
+测试位于 `tests/`，使用 `unittest`。共享 fixture 在 `tests/conftest.py`（`build_settings`、`build_transport`）。天气测试通过 `httpx.MockTransport` mock HTTP 层，Agent 测试通过 `FakeMessagesListChatModel` mock 模型层。
 
 ## 环境变量
 
-所有配置通过 `.env` 加载（`python-dotenv`）。模板见 `.env.example`。包括 OpenAI 兼容接口配置（支持 DeepSeek 等）、embedding 独立配置、和风天气 JWT 凭据、RAG 参数、Tavily 搜索 API Key（`TAVILY_API_KEY`）。
+所有配置通过 `.env` 加载（`python-dotenv`）。模板见 `.env.example`。包括 OpenAI 兼容接口配置（支持 DeepSeek 等）、embedding 独立配置、Vision 模型配置（支持硅基流动等）、和风天气 JWT 凭据、RAG 参数、Tavily 搜索 API Key。
 
 ## 语言
 

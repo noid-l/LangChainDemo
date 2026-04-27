@@ -18,11 +18,11 @@ from typing import Any
 
 from langchain_core.messages import AIMessageChunk
 
-from .config import Settings
-from .logging_utils import get_logger
-from .openai_support import build_chat_model, ensure_chat_api_key
-from .weather import WeatherQueryResult, format_weather_report, query_weather
-from .weather_langchain import build_weather_tool
+from ..config import Settings
+from ..logging_utils import get_logger
+from ..openai_support import build_chat_model, ensure_chat_api_key
+from .agent import build_weather_tool
+from .service import WeatherQueryResult, format_weather_report, query_weather
 
 logger = get_logger(__name__)
 
@@ -63,7 +63,7 @@ def stream_weather_agent_answer(
     from langchain.agents import create_agent
 
     ensure_chat_api_key(settings)
-    from .weather import ensure_qweather_jwt_config
+    from .service import ensure_qweather_jwt_config
 
     ensure_qweather_jwt_config(settings)
 

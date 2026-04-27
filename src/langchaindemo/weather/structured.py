@@ -17,10 +17,20 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from .config import Settings
-from .logging_utils import get_logger
-from .openai_support import build_chat_model, ensure_chat_api_key
-from .weather import CurrentWeather, DailyForecast, query_weather
+from ..config import Settings
+from ..logging_utils import get_logger
+from ..openai_support import build_chat_model, ensure_chat_api_key
+from .service import CurrentWeather, DailyForecast, query_weather
+
+__all__ = [
+    "ClothingAdvice",
+    "CurrentWeather",
+    "DailyForecast",
+    "_format_advice",
+    "advise_weather",
+    "deterministic_advice",
+    "langchain_structured_advice",
+]
 
 logger = get_logger(__name__)
 
@@ -119,7 +129,7 @@ def langchain_structured_advice(
     缺点：可能产生幻觉字段值，依赖模型能力。
     """
     if settings is None:
-        from .config import load_settings
+        from ..config import load_settings
         settings = load_settings()
 
     ensure_chat_api_key(settings)

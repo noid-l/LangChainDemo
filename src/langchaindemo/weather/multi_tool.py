@@ -22,18 +22,18 @@ from typing import Literal
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 
-from .config import Settings
-from .logging_utils import get_logger
-from .openai_support import build_chat_model, ensure_chat_api_key
-from .weather import (
+from ..config import Settings
+from ..logging_utils import get_logger
+from ..openai_support import build_chat_model, ensure_chat_api_key
+from .agent import build_weather_tool
+from .service import (
     WeatherError,
     ensure_qweather_jwt_config,
     format_location_summary,
     format_weather_report,
     query_weather,
 )
-from .weather_langchain import build_weather_tool
-from .weather_structured import ClothingAdvice, _format_advice, deterministic_advice
+from .structured import ClothingAdvice, _format_advice, deterministic_advice
 
 logger = get_logger(__name__)
 

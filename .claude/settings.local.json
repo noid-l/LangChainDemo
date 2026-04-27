@@ -14,7 +14,8 @@
       "Bash(uv add *)",
       "WebSearch",
       "mcp__web-search-prime__web_search_prime",
-      "Bash(RAG_CHUNK_SIZE=400 RAG_CHUNK_OVERLAP=80 uv run *)"
+      "Bash(RAG_CHUNK_SIZE=400 RAG_CHUNK_OVERLAP=80 uv run *)",
+      "Bash(git stash *)"
     ]
   }
 }
