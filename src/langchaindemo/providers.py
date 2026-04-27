@@ -13,7 +13,7 @@ from langchain_core.messages import AIMessage
 from langchain_deepseek import ChatDeepSeek
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
-from .config import Settings
+from .config import PROVIDER_DEFAULTS, Settings
 from .logging_utils import get_logger
 
 logger = get_logger(__name__)
@@ -125,6 +125,7 @@ def _build_qwen(settings: Settings) -> BaseChatModel:
     return ChatQwen(
         api_key=settings.chat_api_key,
         model=settings.chat_model,
+        base_url=settings.chat_base_url,
         temperature=0.2,
     )
 
@@ -143,8 +144,7 @@ def ensure_chat_api_key(settings: Settings) -> None:
 
     logger.error("聊天模型 API Key 缺失。")
     raise SystemExit(
-        "未检测到聊天模型 API Key。请先复制 .env.example 为 .env，"
-        "并填写 OPENAI_API_KEY、CHAT_API_KEY 或 DASHSCOPE_API_KEY。"
+        "未检测到聊天模型 API Key。请在 .env 中设置 CHAT_API_KEY。"
     )
 
 
@@ -154,9 +154,8 @@ def ensure_embedding_api_key(settings: Settings) -> None:
 
     logger.error("Embedding API Key 缺失。")
     raise SystemExit(
-        "未检测到 Embedding API Key。请先在 .env 中填写 "
-        "OPENAI_EMBEDDING_API_KEY、EMBEDDING_API_KEY，"
-        "或沿用 OPENAI_API_KEY。"
+        "未检测到 Embedding API Key。请在 .env 中设置 "
+        "EMBEDDING_API_KEY，或确保 CHAT_API_KEY 已配置。"
     )
 
 
@@ -166,8 +165,8 @@ def ensure_vision_api_key(settings: Settings) -> None:
 
     logger.error("Vision API Key 缺失。")
     raise SystemExit(
-        "未检测到 Vision API Key。请先在 .env 中填写 "
-        "VISION_API_KEY，或沿用 OPENAI_API_KEY。"
+        "未检测到 Vision API Key。请在 .env 中设置 "
+        "VISION_API_KEY，或确保 CHAT_API_KEY 已配置。"
     )
 
 

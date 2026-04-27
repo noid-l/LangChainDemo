@@ -6,11 +6,26 @@ from pathlib import Path
 
 from .logging_utils import get_logger
 
-DEFAULT_CHAT_MODEL = "gpt-4.1-mini"
 DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
 DEFAULT_VISION_MODEL = "zai-org/GLM-4.6V"
-DEFAULT_VISION_BASE_URL = "https://api.siliconflow.cn/v1"
-DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
+
+PROVIDER_DEFAULTS: dict[str, dict[str, str | None]] = {
+    "openai": {
+        "base_url": "https://api.openai.com/v1",
+        "model": "gpt-4.1-mini",
+        "key_env": "OPENAI_API_KEY",
+    },
+    "deepseek": {
+        "base_url": "https://api.deepseek.com",
+        "model": "deepseek-chat",
+        "key_env": "DEEPSEEK_API_KEY",
+    },
+    "qwen": {
+        "base_url": None,
+        "model": "qwen-max",
+        "key_env": "DASHSCOPE_API_KEY",
+    },
+}
 DEFAULT_KNOWLEDGE_DIR = "data/knowledge"
 DEFAULT_VECTOR_STORE_PATH = ".cache/vector_store.json"
 DEFAULT_RAG_TOP_K = 4
@@ -31,6 +46,16 @@ def _read_optional_env(*names: str) -> str | None:
         if value and value.strip():
             return value.strip()
     return None
+
+
+def _read_required_env(*names: str, label: str) -> str:
+    for name in names:
+        value = os.getenv(name)
+        if value and value.strip():
+            return value.strip()
+    raise SystemExit(
+        f"缺少必填配置 {label}。请在 .env 中设置 {names[0]}。"
+    )
 
 
 def _read_int_env(name: str, default: int) -> int:
@@ -58,10 +83,6 @@ def _normalize_url(value: str | None) -> str | None:
     return normalized.rstrip("/")
 
 
-def _is_explicitly_blank(*names: str) -> bool:
-    return any(name in os.environ and not os.environ[name].strip() for name in names)
-
-
 def get_project_root() -> Path:
     project_root = Path(__file__).resolve().parents[2]
     logger.debug("解析项目根目录: %s", project_root)
@@ -73,7 +94,7 @@ class Settings:
     project_root: Path
     knowledge_dir: Path
     vector_store_path: Path
-    chat_provider: str  # openai, deepseek 等
+    chat_provider: str  # openai, deepseek, qwen
     chat_api_key: str | None
     chat_base_url: str | None
     chat_model: str
@@ -104,113 +125,45 @@ def load_settings() -> Settings:
         "VECTOR_STORE_PATH", DEFAULT_VECTOR_STORE_PATH
     )
 
-    embedding_api_key = _read_optional_env(
-        "OPENAI_EMBEDDING_API_KEY",
-        "EMBEDDING_API_KEY",
-    )
-    if embedding_api_key is None and not _is_explicitly_blank(
-        "OPENAI_EMBEDDING_API_KEY",
-        "EMBEDDING_API_KEY",
-    ):
-        embedding_api_key = _read_optional_env(
-            "OPENAI_API_KEY",
-            "DEEPSEEK_API_KEY",
+    # --- 聊天模型 ---
+    chat_provider = _read_required_env("CHAT_PROVIDER", label="CHAT_PROVIDER")
+    provider_defaults = PROVIDER_DEFAULTS.get(chat_provider)
+    if provider_defaults is None:
+        valid = ", ".join(PROVIDER_DEFAULTS)
+        raise SystemExit(
+            f"未知的 CHAT_PROVIDER={chat_provider!r}，可选: {valid}"
         )
 
-    embedding_base_url = _read_optional_env(
-        "OPENAI_EMBEDDING_API_BASE",
-        "OPENAI_EMBEDDING_BASE_URL",
-        "EMBEDDING_BASE_URL",
-    )
-    if embedding_base_url is None and not _is_explicitly_blank(
-        "OPENAI_EMBEDDING_API_BASE",
-        "OPENAI_EMBEDDING_BASE_URL",
-        "EMBEDDING_BASE_URL",
-    ):
-        embedding_base_url = _read_optional_env(
-            "OPENAI_API_BASE",
-            "OPENAI_BASE_URL",
-            "DEEPSEEK_BASE_URL",
-        )
-    embedding_base_url = embedding_base_url or DEFAULT_OPENAI_BASE_URL
+    key_env = provider_defaults["key_env"]
+    chat_api_key = _read_optional_env("CHAT_API_KEY", key_env)
+    chat_base_url = _read_optional_env(
+        "CHAT_BASE_URL",
+        "OPENAI_BASE_URL",
+        "OPENAI_API_BASE",
+    ) or provider_defaults["base_url"]
+    chat_model = _read_optional_env(
+        "CHAT_MODEL",
+        "OPENAI_MODEL",
+        "OPENAI_CHAT_MODEL",
+    ) or provider_defaults["model"]  # type: ignore[assignment]
 
-    embedding_model = _read_optional_env("OPENAI_EMBEDDING_MODEL")
-    if embedding_model is None and not _is_explicitly_blank("OPENAI_EMBEDDING_MODEL"):
-        embedding_model = DEFAULT_EMBEDDING_MODEL
+    # --- 向量模型 ---
+    embedding_api_key = _read_optional_env("EMBEDDING_API_KEY") or chat_api_key
+    embedding_base_url = _read_optional_env("EMBEDDING_BASE_URL") or chat_base_url
+    embedding_model = _read_optional_env("EMBEDDING_MODEL") or DEFAULT_EMBEDDING_MODEL
 
-    # 视觉模型配置：独立 key → 回退到 chat key
-    vision_api_key = _read_optional_env(
-        "VISION_API_KEY",
-        "OPENAI_VISION_API_KEY",
-    )
-    if vision_api_key is None and not _is_explicitly_blank(
-        "VISION_API_KEY",
-        "OPENAI_VISION_API_KEY",
-    ):
-        vision_api_key = _read_optional_env(
-            "OPENAI_API_KEY",
-            "CHAT_API_KEY",
-            "DEEPSEEK_API_KEY",
-        )
-
-    vision_base_url = _read_optional_env(
-        "VISION_BASE_URL",
-        "OPENAI_VISION_API_BASE",
-        "OPENAI_VISION_BASE_URL",
-    )
-    if vision_base_url is None and not _is_explicitly_blank(
-        "VISION_BASE_URL",
-        "OPENAI_VISION_API_BASE",
-        "OPENAI_VISION_BASE_URL",
-    ):
-        vision_base_url = None  # 使用下面的默认值逻辑
-
-    if vision_base_url is None:
-        # 如果有独立的 vision key，说明用户想用专门的视觉平台（如硅基流动）
-        # 此时使用默认视觉平台 URL；否则回退到 chat base_url
-        if _read_optional_env("VISION_API_KEY", "OPENAI_VISION_API_KEY"):
-            vision_base_url = DEFAULT_VISION_BASE_URL
-        else:
-            vision_base_url = _read_optional_env(
-                "OPENAI_API_BASE",
-                "OPENAI_BASE_URL",
-                "CHAT_BASE_URL",
-                "DEEPSEEK_BASE_URL",
-            ) or DEFAULT_OPENAI_BASE_URL
-
-    vision_model = _read_optional_env("VISION_MODEL")
-    if vision_model is None and not _is_explicitly_blank("VISION_MODEL"):
-        vision_model = DEFAULT_VISION_MODEL
-
-    chat_model = _read_optional_env("OPENAI_MODEL", "OPENAI_CHAT_MODEL") or DEFAULT_CHAT_MODEL
-    chat_provider = _read_optional_env("CHAT_PROVIDER")
-    if not chat_provider:
-        model_lower = chat_model.lower()
-        if "deepseek" in model_lower:
-            chat_provider = "deepseek"
-        elif any(kw in model_lower for kw in ("qwen", "qwq")):
-            chat_provider = "qwen"
-        else:
-            chat_provider = "openai"
+    # --- 视觉模型 ---
+    vision_api_key = _read_optional_env("VISION_API_KEY") or chat_api_key
+    vision_base_url = _read_optional_env("VISION_BASE_URL") or chat_base_url
+    vision_model = _read_optional_env("VISION_MODEL") or DEFAULT_VISION_MODEL
 
     settings = Settings(
         project_root=project_root,
         knowledge_dir=knowledge_dir,
         vector_store_path=vector_store_path,
         chat_provider=chat_provider,
-        chat_api_key=_read_optional_env(
-            "OPENAI_API_KEY",
-            "CHAT_API_KEY",
-            "DEEPSEEK_API_KEY",
-            "DASHSCOPE_API_KEY",
-        ),
-        chat_base_url=_read_optional_env(
-            "OPENAI_API_BASE",
-            "OPENAI_BASE_URL",
-            "CHAT_BASE_URL",
-            "DEEPSEEK_BASE_URL",
-        )
-        or DEFAULT_OPENAI_BASE_URL,
+        chat_api_key=chat_api_key,
+        chat_base_url=chat_base_url,
         chat_model=chat_model,
         embedding_api_key=embedding_api_key,
         embedding_base_url=embedding_base_url,
@@ -240,30 +193,15 @@ def load_settings() -> Settings:
         ),
     )
     logger.info(
-        "配置加载完成: knowledge_dir=%s, vector_store_path=%s, chat_model=%s, "
-        "embedding_model=%s, vision_model=%s, rag_top_k=%s, chunk_size=%s, chunk_overlap=%s, "
-        "chat_api_key=%s, embedding_api_key=%s, vision_api_key=%s, qweather_project_id=%s, "
-        "qweather_key_id=%s, qweather_private_key_path=%s, "
-        "qweather_api_host=%s, qweather_jwt_ttl_seconds=%s, "
-        "weather_lang=%s, weather_unit=%s, weather_forecast_days=%s",
-        settings.knowledge_dir,
-        settings.vector_store_path,
+        "配置加载完成: chat_provider=%s, chat_model=%s, "
+        "embedding_model=%s, vision_model=%s, "
+        "chat_api_key=%s, embedding_api_key=%s, vision_api_key=%s",
+        settings.chat_provider,
         settings.chat_model,
         settings.embedding_model,
         settings.vision_model,
-        settings.rag_top_k,
-        settings.chunk_size,
-        settings.chunk_overlap,
         "set" if settings.chat_api_key else "missing",
         "set" if settings.embedding_api_key else "missing",
         "set" if settings.vision_api_key else "missing",
-        "set" if settings.qweather_project_id else "missing",
-        "set" if settings.qweather_key_id else "missing",
-        "set" if settings.qweather_private_key_path else "missing",
-        settings.qweather_api_host or "missing",
-        settings.qweather_jwt_ttl_seconds,
-        settings.weather_lang,
-        settings.weather_unit,
-        settings.weather_forecast_days,
     )
     return settings

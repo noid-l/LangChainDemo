@@ -1,5 +1,6 @@
 """兼容旧 import 路径 — 所有模型构建逻辑已迁移到 providers.py。"""
 from .providers import (  # noqa: F401
+    PROVIDER_DEFAULTS,
     ChatDeepSeekAdapter,
     build_chat_model,
     build_embeddings,

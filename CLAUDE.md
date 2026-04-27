@@ -111,7 +111,14 @@ CLI → handler（各包 handlers.py）→ service 层 → 外部 API 或 LangCh
 
 ## 环境变量
 
-所有配置通过 `.env` 加载（`python-dotenv`）。模板见 `.env.example`。包括 OpenAI 兼容接口配置（支持 DeepSeek、Qwen 等）、embedding 独立配置、Vision 模型配置（支持硅基流动等）、和风天气 JWT 凭据、RAG 参数、Tavily 搜索 API Key。`CHAT_PROVIDER` 支持自动检测：模型名含 `deepseek` → DeepSeek，含 `qwen`/`qwq` → Qwen，其余 → OpenAI。
+所有配置通过 `.env` 加载（`python-dotenv`）。模板见 `.env.example`。
+
+**`CHAT_PROVIDER` 为必填项**（openai / deepseek / qwen），决定使用哪个模型 SDK。环境变量统一命名：
+- 聊天：`CHAT_API_KEY`、`CHAT_MODEL`、`CHAT_BASE_URL`
+- 向量：`EMBEDDING_API_KEY`、`EMBEDDING_MODEL`、`EMBEDDING_BASE_URL`（不填则沿用聊天配置）
+- 视觉：`VISION_API_KEY`、`VISION_MODEL`、`VISION_BASE_URL`（不填则沿用聊天配置）
+
+每个提供者有专属 key 回退：`CHAT_API_KEY` 未设时，按 provider 查找 `OPENAI_API_KEY` / `DEEPSEEK_API_KEY` / `DASHSCOPE_API_KEY`。
 
 ## 语言
 
