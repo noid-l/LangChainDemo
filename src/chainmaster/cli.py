@@ -55,10 +55,12 @@ def build_parser() -> NoExitArgumentParser:
     from .weather import register_handlers as register_weather
     from .knowledge import register_handlers as register_knowledge
     from .tools import register_handlers as register_tools
+    from .skills import register_handlers as register_skills
 
     register_weather(subparsers)
     register_knowledge(subparsers)
     register_tools(subparsers)
+    register_skills(subparsers)
 
     return parser
 

@@ -54,6 +54,11 @@ src/chainmaster/
 │   ├── rag.py          # 索引构建/检索/问答
 │   └── handlers.py     # CLI handler + register_handlers()
 │
+├── skills/              # Skills 技能系统
+│   ├── registry.py      # SkillRegistry 技能注册表（扫描、索引）
+│   ├── loader.py        # load_skill / list_skills Agent 工具
+│   └── handlers.py      # CLI handler + register_handlers()
+│
 └── tools/              # 独立工具包
     ├── web_search.py   # Tavily 搜索
     ├── document_qa.py  # PDF/Word/TXT 问答
@@ -98,6 +103,10 @@ src/chainmaster/
 - **Web Search** — `web_search.py`
 - **Code Generation** — `data_analysis.py`
 - **MarkItDown + Vision OCR** — `markitdown.py`
+
+**Skills 技能系统**（`skills/`）：
+- **Agent Skills / SKILL.md** — `registry.py`：技能扫描、索引、渐进式加载
+- **Progressive Disclosure** — `loader.py`：`load_skill` / `list_skills` 工具
 
 **统一 Agent** — `agent.py`：整合所有工具，InMemoryChatMessageHistory 多轮会话
 

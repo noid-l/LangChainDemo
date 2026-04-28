@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+import fcntl
 from pathlib import Path
 from typing import Any
 
@@ -72,6 +73,7 @@ class GraphStore:
         self._path = Path(os.path.expanduser(raw))
         self._entities: dict[str, Entity] = {}
         self._relations: list[Relation] = []
+        self._lockfile: Path = self._path.with_suffix(".lock")
         self._load()
 
     @property
@@ -107,9 +109,27 @@ class GraphStore:
             import logging
             logging.getLogger(__name__).warning("记忆文件加载出错（部分数据可能丢失）: %s", e)
 
+    def _acquire_lock(self):
+        """获取文件锁，防止多进程并发写入丢失数据。"""
+        self._lockfile.parent.mkdir(parents=True, exist_ok=True)
+        lock_fd = os.open(str(self._lockfile), os.O_CREAT | os.O_RDWR)
+        fcntl.flock(lock_fd, fcntl.LOCK_EX)
+        return lock_fd
+
+    def _release_lock(self, lock_fd: int) -> None:
+        fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        os.close(lock_fd)
+
     def _save(self) -> None:
-        """原子写入：先写临时文件，再 rename 覆盖。"""
+        """原子写入：先写临时文件，再 rename 覆盖。使用文件锁防止并发写入。"""
         self._path.parent.mkdir(parents=True, exist_ok=True)
+        lock_fd = self._acquire_lock()
+        try:
+            self._write_atomically()
+        finally:
+            self._release_lock(lock_fd)
+
+    def _write_atomically(self) -> None:
         lines: list[str] = []
 
         for entity in self._entities.values():

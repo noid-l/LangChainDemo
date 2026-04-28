@@ -25,6 +25,8 @@ dependencies = [
     "langchain-qwq>=0.3.4",
     "prompt-toolkit>=3.0.52",
     "mcp>=1.27.0",
+    "rank-bm25>=0.2.2",
+    "langsmith>=0.7.32",
 ]
 
 [project.scripts]

@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 DEFAULT_MAX_CHARS = 12000
+DEFAULT_HARD_MAX_CHARS = 36000
 DEFAULT_KEEP_LAST = 4
 _SUMMARY_PROMPT = (
     "请将以下对话历史压缩为一段简洁的摘要，保留关键事实、用户偏好和重要决策。"
@@ -39,12 +40,14 @@ def compact_if_needed(
     store: ChatHistoryStore,
     *,
     max_chars: int = DEFAULT_MAX_CHARS,
+    hard_max_chars: int = DEFAULT_HARD_MAX_CHARS,
     keep_last: int = DEFAULT_KEEP_LAST,
     model=None,
 ) -> bool:
     """检查会话长度并在超限时执行压缩。
 
     返回 True 表示执行了压缩，False 表示无需压缩。
+    超过 hard_max_chars 时强制截断，不依赖 LLM 摘要。
     """
     total = store.total_chars()
     if total < max_chars:
@@ -57,6 +60,13 @@ def compact_if_needed(
 
     summary = _generate_summary(store, model=model)
     if not summary:
+        if total >= hard_max_chars:
+            logger.warning(
+                "会话 [%s] 超过硬限制 (%d / %d)，强制截断。",
+                store.session_id, total, hard_max_chars,
+            )
+            store.remove_older_than(keep_last)
+            return True
         logger.warning("摘要生成失败，跳过压缩。")
         return False
 

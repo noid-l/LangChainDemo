@@ -189,7 +189,6 @@ def _build_delegate_task_tool(settings: Settings) -> StructuredTool:
     def delegate_task(task: str, context: str = "") -> str:
         logger.info("delegate_task 子代理启动: task=%s", task[:80])
         try:
-            from langchain.agents import create_agent
             ensure_chat_api_key(settings)
             model = build_chat_model(settings)
 
@@ -321,6 +320,15 @@ def build_all_tools(settings: Settings) -> list[StructuredTool]:
     except Exception:
         logger.warning("MCP 工具加载跳过。")
 
+    # Skills 技能工具（load_skill / list_skills）
+    try:
+        from .skills.loader import build_load_skill_tool, build_list_skills_tool
+        tools.append(build_load_skill_tool())
+        tools.append(build_list_skills_tool())
+        logger.info("Skills 技能工具已加载。")
+    except Exception:
+        logger.warning("Skills 技能工具加载跳过。")
+
     logger.info("统一 Agent 工具列表: %s", [t.name for t in tools])
     return tools
 
@@ -340,6 +348,8 @@ UNIFIED_SYSTEM_PROMPT = "\n".join([
     "10. markitdown_qa — 读取多种格式文件并回答问题",
     "11. search_history — 从历史对话中检索之前讨论过的内容",
     "12. delegate_task — 委派子代理处理高密度任务（日志分析、文档摘要等），只回传结论",
+    "13. list_skills — 列出所有可用的 Agent 技能",
+    "14. load_skill — 加载指定技能的完整指令",
     "",
     "**记忆工具（MCP）**：你拥有长期记忆能力，可以记住用户信息和项目知识：",
     "- mcp_create_entities — 创建实体（人、项目、技术等），自动记录观察",
@@ -362,6 +372,7 @@ UNIFIED_SYSTEM_PROMPT = "\n".join([
     "- 大量文本处理、日志分析、文档摘要 → delegate_task（委派子代理，避免上下文污染）",
     "- 记住用户信息（「记住我喜欢...」「我在做...」）→ mcp_create_entities + mcp_add_observations",
     "- 查询已记住的用户信息 → mcp_search_nodes / mcp_open_nodes",
+    "- 代码审查、文档摘要、翻译等专业任务 → 先 list_skills 查看可用技能，再 load_skill 加载指令执行",
     "- 闲聊或通用问题 → 直接回答",
     "",
     "**主动记忆策略**：当用户透露个人偏好、项目信息或重要决策时，",

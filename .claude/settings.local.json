@@ -25,7 +25,8 @@
       "Bash(echo \"EXIT_CODE=$?\")",
       "mcp__zread__get_repo_structure",
       "mcp__zread__read_file",
-      "Bash(MEMORY_PATH=/tmp/test_memory.json uv run python -m chainmaster.mcp.server.memory)"
+      "Bash(MEMORY_PATH=/tmp/test_memory.json uv run python -m chainmaster.mcp.server.memory)",
+      "Skill(code-review:code-review)"
     ]
   }
 }

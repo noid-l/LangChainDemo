@@ -29,30 +29,43 @@ uv run python -m unittest discover -s tests -v
 
 ```
 src/chainmaster/
-├── cli.py              # 交互式 REPL 入口，支持斜杠命令（如 /config, /rag build）
+├── cli.py              # 交互式 REPL 入口，支持斜杠命令（如 /config, /mcp, /skills）
 ├── config.py           # frozen dataclass Settings，多级回退配置
 ├── providers.py        # 模型提供者注册表（openai/deepseek/qwen），可扩展
 ├── openai_support.py   # 兼容 shim，re-export providers.py
 ├── prompting.py        # PromptTemplate 文本生成
 ├── logging_utils.py    # 日志工具
-├── agent.py            # 统一 Agent 编排器，整合所有工具
+├── agent.py            # 统一 Agent 编排器，整合所有工具与记忆系统
 │
-├── weather/            # 天气领域包
-│   ├── service.py      # 核心 API（JWT 鉴权、地点解析、API 调用）
+├── memory/             # 核心记忆系统
+│   ├── store.py        # SQLite 持久化历史，支持 FTS5 全文检索
+│   └── compaction.py   # 会话自动压缩（摘要生成）
+│
+├── mcp/                # Model Context Protocol 集成
+│   ├── client.py       # MCP 客户端，连接外部工具服务
+│   ├── adapter.py      # MCP 工具适配层，映射为 LangChain StructuredTool
+│   └── server/         # 内置 MCP Server（如知识图谱记忆）
+│
+├── skills/             # 技能系统（Progressive Disclosure）
+│   ├── registry.py     # 扫描 data/skills/*.md 构建轻量索引
+│   └── loader.py       # 按需加载完整指令内容
+│
+├── weather/            # 天气领域包（教学示例集）
+│   ├── service.py      # 确定性 API 实现（JWT、地点解析）
 │   ├── agent.py        # Tool Calling / Agent
 │   ├── chain.py        # LCEL / Runnable
 │   ├── structured.py   # Structured Output
 │   ├── streaming.py    # Streaming
 │   ├── memory.py       # Memory
 │   ├── multi_tool.py   # Multi-Tool Agent
-│   ├── graph.py        # LangGraph StateGraph
+│   ├── graph.py        # LangGraph StateGraph 实现
 │   ├── tracing.py      # Callbacks
-│   └── handlers.py     # CLI handler + register_handlers()
+│   └── handlers.py     # CLI handler
 │
 ├── knowledge/          # RAG 领域包
 │   ├── loader.py       # 文档加载/切分
-│   ├── rag.py          # 索引构建/检索/问答
-│   └── handlers.py     # CLI handler + register_handlers()
+│   ├── rag.py          # 索引构建/检索/问答（InMemoryVectorStore）
+│   └── handlers.py     # CLI handler
 │
 └── tools/              # 独立工具包
     ├── web_search.py   # Tavily 搜索
@@ -60,7 +73,7 @@ src/chainmaster/
     ├── data_analysis.py # CSV 数据分析
     ├── translate.py    # FewShot 翻译
     ├── markitdown.py   # MarkItDown 文件转换 + OCR
-    └── handlers.py     # CLI handler + register_handlers()
+    └── handlers.py     # CLI handler
 ```
 
 ### 扩展新领域
@@ -74,8 +87,10 @@ src/chainmaster/
 
 **基础设施**：
 - **PromptTemplate** — `prompting.py`
-- **模型提供者注册表** — `providers.py`：`register_provider()` 可扩展注册，内置 OpenAI / DeepSeek / Qwen
-- **ChatOpenAI / Embeddings / Vision** — `openai_support.py`（re-export shim）
+- **模型提供者注册表** — `providers.py`：`register_provider()`
+- **ChatMessageHistory** — `memory/store.py` (SQLite 持久化)
+- **Automatic Summary** — `memory/compaction.py` (会话压缩)
+- **Model Context Protocol** — `mcp/` (工具生态扩展)
 
 **天气领域**（`weather/`）：
 - **Tool Calling / Agent** — `agent.py`
@@ -85,21 +100,17 @@ src/chainmaster/
 - **Memory** — `memory.py`
 - **Multi-Tool Agent** — `multi_tool.py`
 - **Callbacks** — `tracing.py`
-- **LangGraph** — `graph.py`
-- **确定性实现** — `service.py`（不依赖 LangChain）
+- **LangGraph** — `graph.py` (StateGraph 工作流)
 
 **RAG 领域**（`knowledge/`）：
 - **Document Loaders** — `loader.py`
 - **RAG** — `rag.py`：InMemoryVectorStore，持久化到 JSON
 
-**工具领域**（`tools/`）：
-- **FewShot Prompt** — `translate.py`
-- **Document Loaders** — `document_qa.py`
-- **Web Search** — `web_search.py`
-- **Code Generation** — `data_analysis.py`
-- **MarkItDown + Vision OCR** — `markitdown.py`
+**技能系统**（`skills/`）：
+- **Progressive Disclosure** — `registry.py` (只加载元数据，按需加载指令)
+- **System Prompt Optimization** — `loader.py` (动态注入指令)
 
-**统一 Agent** — `agent.py`：整合所有工具，InMemoryChatMessageHistory 多轮会话
+**统一 Agent** — `agent.py`：整合所有工具，ChatHistoryStore 持久化会话，支持自动压缩。
 
 ### 数据流
 
@@ -117,8 +128,8 @@ src/chainmaster/
 
 **`CHAT_PROVIDER` 为必填项**（openai / deepseek / qwen）。环境变量统一命名：
 - 聊天：`CHAT_API_KEY`、`CHAT_MODEL`、`CHAT_BASE_URL`
-- 向量：`EMBEDDING_API_KEY`、`EMBEDDING_MODEL`、`EMBEDDING_BASE_URL`（不填则沿用聊天配置）
-- 视觉：`VISION_API_KEY`、`VISION_MODEL`、`VISION_BASE_URL`（不填则沿用聊天配置）
+- 向量：`EMBEDDING_API_KEY`、`EMBEDDING_MODEL`、`EMBEDDING_BASE_URL`
+- 视觉：`VISION_API_KEY`、`VISION_MODEL`、`VISION_BASE_URL`
 
 ## 语言
 

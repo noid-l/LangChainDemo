@@ -147,6 +147,10 @@ class ChatHistoryStore(BaseChatMessageHistory):
                 result.append(msg)
         return result
 
+    @messages.setter
+    def messages(self, value: list[BaseMessage]) -> None:
+        raise AttributeError("ChatHistoryStore.messages 不支持直接赋值，请使用 add_message()")
+
     def add_message(self, message: BaseMessage) -> None:
         role = _message_type_to_role(message)
         content = message.content if isinstance(message.content, str) else json.dumps(message.content, ensure_ascii=False)
