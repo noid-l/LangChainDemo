@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import unittest
 
-from langchaindemo.config import Settings
-from langchaindemo.weather import (
+from chainmaster.config import Settings
+from chainmaster.weather import (
     AmbiguousLocationError,
     LocationNotFoundError,
     WeatherApiError,

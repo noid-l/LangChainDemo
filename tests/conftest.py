@@ -9,7 +9,7 @@ import jwt
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
-from langchaindemo.config import Settings
+from chainmaster.config import Settings
 
 
 def build_private_key_pem() -> str:
@@ -22,7 +22,7 @@ def build_private_key_pem() -> str:
 
 
 def build_settings() -> Settings:
-    project_root = Path("/tmp/langchaindemo")
+    project_root = Path("/tmp/chainmaster")
     project_root.mkdir(parents=True, exist_ok=True)
     private_key_path = project_root / "qweather-test-private.pem"
     private_key_path.write_text(build_private_key_pem(), encoding="utf-8")

@@ -6,8 +6,8 @@ import json
 import unittest
 from unittest.mock import MagicMock, patch
 
-from langchaindemo.weather import query_weather
-from langchaindemo.weather.structured import (
+from chainmaster.weather import query_weather
+from chainmaster.weather.structured import (
     ClothingAdvice,
     _format_advice,
     deterministic_advice,
@@ -19,7 +19,7 @@ from tests.conftest import build_settings, build_transport
 class DeterministicAdviceTests(unittest.TestCase):
     def test_cold_weather(self) -> None:
         """寒冷天气：需要外套、帽子等"""
-        from langchaindemo.weather import CurrentWeather
+        from chainmaster.weather import CurrentWeather
 
         current = CurrentWeather(
             obs_time="2026-04-26T08:00+08:00",
@@ -45,7 +45,7 @@ class DeterministicAdviceTests(unittest.TestCase):
 
     def test_hot_weather(self) -> None:
         """炎热天气：不需要外套"""
-        from langchaindemo.weather import CurrentWeather
+        from chainmaster.weather import CurrentWeather
 
         current = CurrentWeather(
             obs_time="2026-07-26T14:00+08:00",
@@ -69,7 +69,7 @@ class DeterministicAdviceTests(unittest.TestCase):
 
     def test_rainy_weather(self) -> None:
         """雨天：建议带伞"""
-        from langchaindemo.weather import CurrentWeather, DailyForecast
+        from chainmaster.weather import CurrentWeather, DailyForecast
 
         current = CurrentWeather(
             obs_time="2026-04-26T10:00+08:00",
@@ -109,7 +109,7 @@ class DeterministicAdviceTests(unittest.TestCase):
 
     def test_uv_warning(self) -> None:
         """高紫外线指数"""
-        from langchaindemo.weather import CurrentWeather, DailyForecast
+        from chainmaster.weather import CurrentWeather, DailyForecast
 
         current = CurrentWeather(
             obs_time="2026-06-26T12:00+08:00",

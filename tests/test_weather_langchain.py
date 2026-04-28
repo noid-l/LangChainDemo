@@ -5,7 +5,7 @@ import unittest
 from langchain_core.language_models.fake_chat_models import FakeMessagesListChatModel
 from langchain_core.messages import AIMessage
 
-from langchaindemo.weather.agent import (
+from chainmaster.weather.agent import (
     answer_weather_question,
     build_weather_tool,
     extract_agent_answer,

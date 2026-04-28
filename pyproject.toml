@@ -1,5 +1,5 @@
 [project]
-name = "LangChainDemo"
+name = "ChainMaster"
 version = "0.1.0"
 description = "A uv-based LangChain starter project"
 readme = "README.md"
@@ -23,10 +23,11 @@ dependencies = [
     "python-dotenv>=1.2.2",
     "markitdown[pdf]>=0.1.1",
     "langchain-qwq>=0.3.4",
+    "prompt-toolkit>=3.0.52",
 ]
 
 [project.scripts]
-langchaindemo = "langchaindemo:main"
+chainmaster = "chainmaster:main"
 
 [[tool.uv.index]]
 url = "https://pypi.tuna.tsinghua.edu.cn/simple"

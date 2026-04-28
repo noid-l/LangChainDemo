@@ -12,8 +12,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # 安装依赖
 uv sync
 
-# 运行 CLI（所有命令通过此入口）
-uv run langchaindemo <command>
+# 启动交互式终端（推荐）
+uv run chainmaster
 
 # 运行全部测试
 uv run python -m pytest tests/
@@ -28,8 +28,8 @@ uv run python -m unittest discover -s tests -v
 ## 架构概览
 
 ```
-src/langchaindemo/
-├── cli.py              # CLI 解析 + 调度（~170 行），领域子命令由各包自注册
+src/chainmaster/
+├── cli.py              # 交互式 REPL 入口，支持斜杠命令（如 /config, /rag build）
 ├── config.py           # frozen dataclass Settings，多级回退配置
 ├── providers.py        # 模型提供者注册表（openai/deepseek/qwen），可扩展
 ├── openai_support.py   # 兼容 shim，re-export providers.py
@@ -103,7 +103,9 @@ src/langchaindemo/
 
 ### 数据流
 
-CLI → handler（各包 handlers.py）→ service 层 → 外部 API 或 LangChain chain。`chat` 命令通过 Agent 自动路由到对应工具。
+交互式终端 → `cli.py`。
+- 如果输入以 `/` 开头：路由到对应的子命令 handler。
+- 如果是普通文本：路由到 `agent.py` 的统一 Agent 进行自动处理。
 
 ## 测试约定
 

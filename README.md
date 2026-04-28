@@ -1,4 +1,4 @@
-# LangChainDemo
+# ChainMaster
 
 这是一个以学习 LangChain 为核心目标的教学型 demo 项目。
 
@@ -95,67 +95,67 @@ WEATHER_TIMEOUT_SECONDS=10
 离线查看 PromptTemplate 渲染结果：
 
 ```bash
-uv run langchaindemo --topic "介绍 LangChain" --tone "专业" --dry-run
+uv run chainmaster --topic "介绍 LangChain" --tone "专业" --dry-run
 ```
 
 调用 OpenAI 执行普通生成：
 
 ```bash
-uv run langchaindemo prompt --topic "介绍 LangChain" --tone "专业"
+uv run chainmaster prompt --topic "介绍 LangChain" --tone "专业"
 ```
 
 构建本地知识库索引：
 
 ```bash
-uv run langchaindemo rag build
+uv run chainmaster rag build
 ```
 
 离线预览 RAG 提示词：
 
 ```bash
-uv run langchaindemo rag ask "RAG 的典型流程是什么？" --dry-run
+uv run chainmaster rag ask "RAG 的典型流程是什么？" --dry-run
 ```
 
 执行真实 RAG 问答：
 
 ```bash
-uv run langchaindemo rag ask "RAG 的典型流程是什么？"
+uv run chainmaster rag ask "RAG 的典型流程是什么？"
 ```
 
 查看当前生效配置：
 
 ```bash
-uv run langchaindemo config
+uv run chainmaster config
 ```
 
 查询城市天气：
 
 ```bash
-uv run langchaindemo weather "北京"
+uv run chainmaster weather "北京"
 ```
 
 使用 LangChain Agent 处理自然语言天气问题：
 
 ```bash
-uv run langchaindemo weather ask "明天北京天气怎么样？"
+uv run chainmaster weather ask "明天北京天气怎么样？"
 ```
 
 通过上级行政区消歧：
 
 ```bash
-uv run langchaindemo weather "西安" --adm "陕西"
+uv run chainmaster weather "西安" --adm "陕西"
 ```
 
 使用经纬度查询天气：
 
 ```bash
-uv run langchaindemo weather "116.41,39.92"
+uv run chainmaster weather "116.41,39.92"
 ```
 
 查询 7 天天气预报：
 
 ```bash
-uv run langchaindemo weather "上海" --days 7
+uv run chainmaster weather "上海" --days 7
 ```
 
 ## LangChain 学习点
@@ -183,16 +183,16 @@ uv run langchaindemo weather "上海" --days 7
 ├── .env.example
 ├── .cache/
 ├── skills/
-└── src/langchaindemo/
+└── src/chainmaster/
 ```
 
 ## 模块说明
 
-- `src/langchaindemo/config.py`：环境变量、路径与代理配置
-- `src/langchaindemo/openai_support.py`：OpenAI 聊天模型与 embeddings 工厂
-- `src/langchaindemo/prompting.py`：PromptTemplate 与 RAG 提示词模板
-- `src/langchaindemo/knowledge.py`：知识库文档加载与文本切分
-- `src/langchaindemo/rag.py`：索引构建、检索、RAG 问答与离线预览
-- `src/langchaindemo/weather.py`：天气地点解析、JWT 生成、天气 API 查询与结果格式化
-- `src/langchaindemo/weather_langchain.py`：LangChain 天气 Tool 与 Agent 问答示例
-- `src/langchaindemo/cli.py`：命令行入口
+- `src/chainmaster/config.py`：环境变量、路径与代理配置
+- `src/chainmaster/openai_support.py`：OpenAI 聊天模型与 embeddings 工厂
+- `src/chainmaster/prompting.py`：PromptTemplate 与 RAG 提示词模板
+- `src/chainmaster/knowledge.py`：知识库文档加载与文本切分
+- `src/chainmaster/rag.py`：索引构建、检索、RAG 问答与离线预览
+- `src/chainmaster/weather.py`：天气地点解析、JWT 生成、天气 API 查询与结果格式化
+- `src/chainmaster/weather_langchain.py`：LangChain 天气 Tool 与 Agent 问答示例
+- `src/chainmaster/cli.py`：命令行入口
