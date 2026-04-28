@@ -15,6 +15,7 @@ import asyncio
 import json
 import os
 import threading
+from contextlib import AsyncExitStack
 from pathlib import Path
 from typing import Any
 
@@ -55,13 +56,17 @@ def load_mcp_config() -> dict[str, Any]:
 
 
 class _ServerConnection:
-    """单个 MCP Server 的连接上下文。"""
+    """单个 MCP Server 的连接上下文。
+
+    使用 AsyncExitStack 管理 stdio_client 和 ClientSession 的生命周期。
+    所有 async 方法必须由同一个 task 调用（通过 MCPManager 的 _agent_task 保证）。
+    """
 
     def __init__(self, name: str, params: StdioServerParameters) -> None:
         self.name = name
         self.params = params
         self._session: ClientSession | None = None
-        self._cm_stack: Any = None
+        self._exit_stack: AsyncExitStack | None = None
         self._tools: list[dict[str, Any]] = []
 
     @property
@@ -72,11 +77,13 @@ class _ServerConnection:
         """启动 Server 进程并初始化会话。"""
         logger.info("正在启动 MCP Server [%s]: %s %s", self.name, self.params.command, " ".join(self.params.args or []))
         try:
-            self._cm_stack = stdio_client(self.params)
-            read, write = await self._cm_stack.__aenter__()
-            self._session = ClientSession(read, write)
-            await self._session.__aenter__()
-            await self._session.initialize()
+            stack = AsyncExitStack()
+            read, write = await stack.enter_async_context(stdio_client(self.params))
+            session = await stack.enter_async_context(ClientSession(read, write))
+            await session.initialize()
+
+            self._exit_stack = stack
+            self._session = session
             await self._refresh_tools()
             logger.info("MCP Server [%s] 已启动，发现 %d 个工具", self.name, len(self._tools))
         except Exception:
@@ -113,20 +120,13 @@ class _ServerConnection:
 
     async def stop(self) -> None:
         """关闭会话并终止 Server 进程。"""
-        if self._session:
+        if self._exit_stack:
             try:
-                await self._session.__aexit__(None, None, None)
+                await self._exit_stack.aclose()
             except Exception:
                 pass
-            self._session = None
-
-        if self._cm_stack:
-            try:
-                await self._cm_stack.__aexit__(None, None, None)
-            except Exception:
-                pass
-            self._cm_stack = None
-
+            self._exit_stack = None
+        self._session = None
         logger.info("MCP Server [%s] 已停止", self.name)
 
 
@@ -134,6 +134,10 @@ class MCPManager:
     """MCP 客户端管理器。
 
     管理所有 MCP Server 的连接生命周期，提供工具发现与调用的同步接口。
+
+    核心设计：使用单个常驻 async task（_agent_task）处理所有 MCP 操作，
+    确保 anyio 的 cancel scope 不会跨 task（run_coroutine_threadsafe 每次
+    创建新 task，会导致 stdio_client 的 anyio TaskGroup 报错）。
 
     用法::
 
@@ -149,26 +153,50 @@ class MCPManager:
         self._connections: dict[str, _ServerConnection] = {}
         self._loop: asyncio.AbstractEventLoop | None = None
         self._thread: threading.Thread | None = None
+        self._queue: asyncio.Queue | None = None
 
     def _ensure_loop(self) -> asyncio.AbstractEventLoop:
-        """确保后台事件循环运行。"""
-        if self._loop is not None and self._loop.is_running():
+        """确保后台事件循环和 agent task 运行。"""
+        if self._loop is not None and self._loop.is_running() and self._queue is not None:
             return self._loop
 
         self._loop = asyncio.new_event_loop()
+        self._queue = asyncio.Queue()
         self._thread = threading.Thread(
             target=self._loop.run_forever,
             daemon=True,
             name="mcp-event-loop",
         )
         self._thread.start()
+
+        # 启动常驻 agent task，所有 MCP 操作都在这个 task 里执行
+        asyncio.run_coroutine_threadsafe(self._agent_task(), self._loop)
         return self._loop
 
+    async def _agent_task(self) -> None:
+        """常驻 task：从队列中取出协程并执行，保证都在同一个 task 中。"""
+        while True:
+            coro, future = await self._queue.get()
+            try:
+                result = await coro
+                future.set_result(result)
+            except Exception as exc:
+                if not future.done():
+                    future.set_exception(exc)
+
     def _run_async(self, coro):
-        """在后台事件循环中提交协程并等待结果。"""
+        """通过常驻 agent task 执行协程，确保不跨 task。"""
         loop = self._ensure_loop()
-        future = asyncio.run_coroutine_threadsafe(coro, loop)
+        future = asyncio.run_coroutine_threadsafe(
+            self._dispatch(coro), loop
+        )
         return future.result(timeout=60)
+
+    async def _dispatch(self, coro):
+        """将协程提交到 agent task 的队列中等待执行。"""
+        future = self._loop.create_future()
+        await self._queue.put((coro, future))
+        return await future
 
     def startup(self) -> None:
         """启动配置中所有 MCP Server。"""
@@ -207,6 +235,7 @@ class MCPManager:
             self._thread.join(timeout=5)
         self._loop = None
         self._thread = None
+        self._queue = None
 
         logger.info("MCP Manager 已关闭。")
 
