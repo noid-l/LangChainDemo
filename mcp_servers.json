@@ -6,6 +6,13 @@
       "env": {
         "MEMORY_PATH": "~/.chainmaster/memory_graph.json"
       }
+    },
+    "filesystem": {
+      "command": "python",
+      "args": ["-m", "chainmaster.mcp.server.filesystem"],
+      "env": {
+        "MCP_FS_ROOT": "data/sandbox/"
+      }
     }
   }
 }

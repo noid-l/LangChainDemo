@@ -116,6 +116,11 @@ class Settings:
     weather_unit: str
     weather_forecast_days: int
     weather_timeout_seconds: float
+    # --- LangChain Tracing ---
+    langchain_tracing_v2: bool
+    langchain_endpoint: str | None
+    langchain_api_key: str | None
+    langchain_project: str | None
 
 
 def load_settings() -> Settings:
@@ -191,17 +196,17 @@ def load_settings() -> Settings:
         weather_timeout_seconds=_read_float_env(
             "WEATHER_TIMEOUT_SECONDS", DEFAULT_WEATHER_TIMEOUT_SECONDS
         ),
+        langchain_tracing_v2=os.getenv("LANGCHAIN_TRACING_V2", "false").lower() == "true",
+        langchain_endpoint=_read_optional_env("LANGCHAIN_ENDPOINT"),
+        langchain_api_key=_read_optional_env("LANGCHAIN_API_KEY"),
+        langchain_project=_read_optional_env("LANGCHAIN_PROJECT") or "ChainMaster",
     )
     logger.info(
         "配置加载完成: chat_provider=%s, chat_model=%s, "
-        "embedding_model=%s, vision_model=%s, "
-        "chat_api_key=%s, embedding_api_key=%s, vision_api_key=%s",
+        "tracing=%s, project=%s",
         settings.chat_provider,
         settings.chat_model,
-        settings.embedding_model,
-        settings.vision_model,
-        "set" if settings.chat_api_key else "missing",
-        "set" if settings.embedding_api_key else "missing",
-        "set" if settings.vision_api_key else "missing",
+        "enabled" if settings.langchain_tracing_v2 else "disabled",
+        settings.langchain_project,
     )
     return settings

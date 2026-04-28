@@ -13,7 +13,8 @@
 from __future__ import annotations
 
 import sys
-from typing import Any
+from enum import Enum
+from typing import Any, Protocol
 
 from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage
 from langchain_core.tools import StructuredTool
@@ -27,6 +28,35 @@ from .mcp.client import MCPManager
 from .openai_support import build_chat_model, ensure_chat_api_key
 
 logger = get_logger(__name__)
+
+
+class ReasoningMode(str, Enum):
+    """推理模式枚举。"""
+    DIRECT = "direct"  # 直接调用（Zero-shot）
+    REACT = "react"    # ReAct 推理循环
+    PLAN = "plan"      # Plan-and-Execute 规划与执行
+
+
+class ReasoningStrategy(Protocol):
+    """推理策略接口。"""
+    def run(
+        self, 
+        question: str, 
+        history: ChatHistoryStore, 
+        settings: Settings,
+        **kwargs
+    ) -> str:
+        ...
+
+    def stream(
+        self, 
+        question: str, 
+        history: ChatHistoryStore, 
+        settings: Settings,
+        **kwargs
+    ):
+        ...
+
 
 _store_manager: StoreManager | None = None
 _mcp_manager: MCPManager | None = None
@@ -117,6 +147,7 @@ def get_session_history(session_id: str = "default") -> str:
 
 class KnowledgeSearchInput(BaseModel):
     question: str = Field(description="要在知识库中搜索的问题")
+    search_type: str = Field(default="vector", description="搜索类型：vector (向量), bm25 (词法), hybrid (混合)")
 
 
 class SearchHistoryInput(BaseModel):
@@ -132,10 +163,10 @@ def _build_knowledge_search_tool(settings: Settings) -> StructuredTool:
     """构建知识库检索工具。"""
     from .knowledge.rag import answer_question
 
-    def knowledge_search(question: str) -> str:
-        logger.info("knowledge_search 工具被调用: question=%s", question[:100])
+    def knowledge_search(question: str, search_type: str = "vector") -> str:
+        logger.info("knowledge_search 工具被调用: question=%s, type=%s", question[:100], search_type)
         try:
-            result = answer_question(question=question, settings=settings)
+            result = answer_question(question=question, settings=settings, search_type=search_type)
             return result.answer
         except Exception as exc:
             logger.error("知识库检索失败: %s", exc)
@@ -146,7 +177,7 @@ def _build_knowledge_search_tool(settings: Settings) -> StructuredTool:
         name="knowledge_search",
         description=(
             "从本地知识库中检索信息。当用户问关于 LangChain、RAG、OpenAI 代理等"
-            "技术概念的问题时使用。不适用于天气查询。"
+            "技术概念的问题时使用。支持搜索类型：vector (默认), bm25, hybrid。"
         ),
         args_schema=KnowledgeSearchInput,
     )
@@ -384,19 +415,42 @@ UNIFIED_SYSTEM_PROMPT = "\n".join([
 ])
 
 
-def build_unified_agent(settings: Settings, *, model=None):
-    """构建统一 Agent。"""
-    from langchain.agents import create_agent
-
+def build_unified_agent(
+    settings: Settings, 
+    *, 
+    model=None, 
+    mode: ReasoningMode = ReasoningMode.DIRECT
+):
+    """构建统一 Agent。支持不同推理模式。"""
     ensure_chat_api_key(settings)
     tools = build_all_tools(settings)
+    chat_model = model or build_chat_model(settings)
 
+    if mode == ReasoningMode.REACT:
+        from langchain.agents import create_react_agent, AgentExecutor
+        from langchain_core.prompts import ChatPromptTemplate
+        
+        # 教学提示词：ReAct 模式显式要求模型思考
+        react_prompt = ChatPromptTemplate.from_messages([
+            ("system", UNIFIED_SYSTEM_PROMPT + "\n\n请使用 ReAct 模式思考：Thought -> Action -> Observation -> Thought -> Final Answer"),
+            ("placeholder", "{messages}"),
+            ("human", "{input}"),
+            ("placeholder", "{agent_scratchpad}"),
+        ])
+        
+        agent = create_react_agent(chat_model, tools, react_prompt)
+        executor = AgentExecutor(agent=agent, tools=tools, verbose=True, handle_parsing_errors=True)
+        logger.info("ReAct Agent 构建完成")
+        return executor
+
+    # 默认 Direct 模式（LangChain 原生的 create_agent 默认使用 Tool Calling）
+    from langchain.agents import create_agent
     agent = create_agent(
-        model=model or build_chat_model(settings),
+        model=chat_model,
         tools=tools,
         system_prompt=UNIFIED_SYSTEM_PROMPT,
     )
-    logger.info("统一 Agent 构建完成: 工具数=%s", len(tools))
+    logger.info("Direct Agent 构建完成: 工具数=%s", len(tools))
     return agent
 
 
@@ -406,10 +460,11 @@ def chat_unified(
     *,
     session_id: str = "default",
     model=None,
+    mode: ReasoningMode = ReasoningMode.DIRECT,
     config: dict[str, Any] | None = None,
 ) -> str:
     """单次问答。"""
-    agent = build_unified_agent(settings, model=model)
+    agent = build_unified_agent(settings, model=model, mode=mode)
     history = _get_session(session_id, settings)
 
     memory_ctx = _inject_memory_context(question)
@@ -421,11 +476,13 @@ def chat_unified(
             messages.append({"role": "user", "content": msg.content})
         elif isinstance(msg, AIMessage):
             messages.append({"role": "assistant", "content": msg.content})
-    messages.append({"role": "user", "content": question})
+    
+    # 构建输入字典
+    input_data = {"messages": messages, "input": question}
 
-    logger.info("统一 Agent 问答: question=%s, history=%s轮", question[:80], history.message_count() // 2)
+    logger.info("统一 Agent 问答: mode=%s, question=%s, history=%s轮", mode, question[:80], history.message_count() // 2)
 
-    result = agent.invoke({"messages": messages}, config=config or {})
+    result = agent.invoke(input_data, config=config or {})
     answer = _extract_answer(result)
 
     history.add_user_message(question)
@@ -441,10 +498,11 @@ def chat_unified_stream(
     *,
     session_id: str = "default",
     model=None,
+    mode: ReasoningMode = ReasoningMode.DIRECT,
     file: Any | None = None,
 ) -> None:
     """流式问答。"""
-    agent = build_unified_agent(settings, model=model)
+    agent = build_unified_agent(settings, model=model, mode=mode)
     history = _get_session(session_id, settings)
 
     memory_ctx = _inject_memory_context(question)
@@ -456,13 +514,14 @@ def chat_unified_stream(
             messages.append({"role": "user", "content": msg.content})
         elif isinstance(msg, AIMessage):
             messages.append({"role": "assistant", "content": msg.content})
-    messages.append({"role": "user", "content": question})
+    
+    input_data = {"messages": messages, "input": question}
 
     output = file or sys.stdout
     collected: list[str] = []
 
     for chunk in agent.stream(
-        {"messages": messages},
+        input_data,
         stream_mode="messages",
         version="v2",
     ):
@@ -491,6 +550,11 @@ def chat_unified_stream(
 
 
 def _extract_answer(agent_result: dict) -> str:
+    # 兼容 AgentExecutor 的返回
+    if "output" in agent_result:
+        return str(agent_result["output"]).strip()
+
+    # 兼容 create_agent (Runnable) 的返回
     messages = agent_result.get("messages", [])
     for message in reversed(messages):
         if isinstance(message, AIMessage):

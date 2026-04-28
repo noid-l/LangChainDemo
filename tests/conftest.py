@@ -52,6 +52,10 @@ def build_settings() -> Settings:
         weather_unit="m",
         weather_forecast_days=3,
         weather_timeout_seconds=10.0,
+        langchain_tracing_v2=False,
+        langchain_endpoint=None,
+        langchain_api_key=None,
+        langchain_project="ChainMasterTest",
     )
 
 

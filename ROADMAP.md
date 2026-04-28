@@ -13,9 +13,9 @@
 > 核心目标：解构 Agent 推理过程，实现从“自动驾驶”到“辅助驾驶”的精细化控制。
 
 ### 1.1 推理策略多样化 (Advanced Reasoning)
-- [ ] **多模式切换架构**：在 `agent.py` 中抽象 `BaseReasoning` 接口，支持运行时动态切换。
-- [ ] **ReAct 深度集成**：
-    - [ ] 实现标准 ReAct 循环，并在 CLI 中以颜色区分“思考(Thought)”和“行动(Action)”。
+- [x] **多模式切换架构**：在 `agent.py` 中抽象 `BaseReasoning` 接口，支持运行时动态切换。
+- [x] **ReAct 深度集成**：
+    - [x] 实现标准 ReAct 循环，并在 CLI 中以颜色区分“思考(Thought)”和“行动(Action)”。
     - [ ] 优化 Observation 解析，支持处理工具返回的超长结果（自动摘要）。
 - [ ] **Plan-and-Execute 模式**：
     - [ ] 实现 `Planner`：将复杂任务拆解为 Pydantic 定义的 `Plan` 对象。
@@ -82,8 +82,8 @@
 - [ ] **多查询转换 (Multi-Query/HyDE)**：
     - [ ] 实现 `MultiQueryRetriever`：自动从不同视角拆解用户问题。
     - [ ] 实现 `HyDE (Hypothetical Document Embeddings)`：通过假设性回答提升语义召回精度。
-- [ ] **混合搜索后端 (Hybrid Search)**：
-    - [ ] 引入 `BM25` 关键词检索，与向量相似度进行 `RRF (Reciprocal Rank Fusion)` 融合。
+- [x] **混合搜索后端 (Hybrid Search)**：
+    - [x] 引入 `BM25` 关键词检索，与向量相似度进行 `RRF (Reciprocal Rank Fusion)` 融合。
     - [ ] 抽象 `VectorStoreBackend`：支持在配置中一键切换 ChromaDB, FAISS 或 DuckDB。
 - [ ] **增量索引管理**：实现基于文件指纹（Hash）的更新机制，支持只重新处理变更文档。
 
@@ -113,17 +113,17 @@
 > 核心目标：构建基于 Model Context Protocol 的可插拔工具生态，实现工具与核心逻辑的深度解耦。
 
 ### 4.1 MCP 基础设施与生命周期管理 (Infrastructure)
-- [ ] **动态服务发现与接入**：
-    - [ ] 实现从配置文件自动加载外部 MCP Server（基于 stdio/sse）。
-    - [ ] 实现 `/mcp list` 命令：实时列出已连接的 Server 及其暴露的工具 Schema。
+- [x] **动态服务发现与接入**：
+    - [x] 实现从配置文件自动加载外部 MCP Server（基于 stdio/sse）。
+    - [x] 实现 `/mcp list` 命令：实时列出已连接的 Server 及其暴露的工具 Schema。
 - [ ] **服务运行监控 (Health Checks)**：
     - [ ] 实现 MCP Server 的保活与自动重启机制。
     - [ ] 实现资源限制与超时控制，防止异常 Server 拖垮 Agent。
 - [ ] **协议交互可视化**：在调试模式下展示完整的 MCP JSON-RPC 报文交互过程。
 
 ### 4.2 专业 MCP Server 矩阵开发 (Practical Servers)
-- [ ] **FileSystem 安全沙箱 Server**：
-    - [ ] 提供受限的文件读写能力，支持设置允许操作的根目录白名单。
+- [x] **FileSystem 安全沙箱 Server**：
+    - [x] 提供受限的文件读写能力，支持设置允许操作的根目录白名单。
 - [ ] **高级 Git 助手 Server**：
     - [ ] 封装 Diff 分析、Commit 自动总结、分支切换等高阶研发协作功能。
 - [ ] **结构化数据查询 Server**：
@@ -178,8 +178,8 @@
 > 核心目标：解决 Agent 调试难、成本不可控、质量难评估的痛点，构建工业级可观测性。
 
 ### 6.1 全链路追踪与成本审计 (Observability)
-- [ ] **LangSmith/LangFuse 深度集成**：
-    - [ ] 实现针对 LangGraph 每一个 Node/Edge 的颗粒度追踪。
+- [x] **LangSmith/LangFuse 深度集成**：
+    - [x] 实现针对 LangGraph 每一个 Node/Edge 的颗粒度追踪。
     - [ ] 支持在 Web UI 中可视化查看 Agent 的推理路径与工具调用报文。
 - [ ] **实时消耗看板**：
     - [ ] CLI 实时显示当前对话的 Token 数、API 耗时、费用预估（基于各模型单价映射表）。

@@ -8,6 +8,7 @@ from pathlib import Path
 from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.vectorstores import InMemoryVectorStore
+from rank_bm25 import BM25Okapi
 
 from ..config import Settings
 from .loader import ChunkingOptions, load_knowledge_documents, split_documents
@@ -84,6 +85,7 @@ def answer_question(
     *,
     rebuild_index: bool = False,
     top_k: int | None = None,
+    search_type: str = "vector",  # "vector", "bm25", "hybrid"
 ) -> RagAnswer:
     total_started_at = perf_counter()
     index_build_result: IndexBuildResult | None = None
@@ -125,9 +127,26 @@ def answer_question(
     used_top_k = top_k or settings.rag_top_k
 
     retrieval_started_at = perf_counter()
-    documents = vector_store.similarity_search(question, k=used_top_k)
+    
+    if search_type == "vector":
+        documents = vector_store.similarity_search(question, k=used_top_k)
+    elif search_type == "bm25":
+        # 获取存储的所有文档用于 BM25
+        all_docs = list(vector_store.store.values())
+        documents = bm25_search(question, all_docs, k=used_top_k)
+    elif search_type == "hybrid":
+        # 双路召回
+        vector_docs = vector_store.similarity_search(question, k=used_top_k * 2)
+        all_docs = list(vector_store.store.values())
+        bm25_docs = bm25_search(question, all_docs, k=used_top_k * 2)
+        documents = reciprocal_rank_fusion(vector_docs, bm25_docs, k=used_top_k)
+    else:
+        logger.warning("未知的 search_type=%s，回退到 vector 搜索。", search_type)
+        documents = vector_store.similarity_search(question, k=used_top_k)
+
     logger.info(
-        "相似度检索完成，耗时 %.0f ms，top_k=%s，命中=%s",
+        "%s 检索完成，耗时 %.0f ms，top_k=%s，命中=%s",
+        search_type.upper(),
         (perf_counter() - retrieval_started_at) * 1000,
         used_top_k,
         len(documents),
@@ -165,6 +184,48 @@ def answer_question(
         rebuilt_index=needs_rebuild,
         index_build_result=index_build_result,
     )
+
+
+def bm25_search(question: str, documents: list[Document], k: int) -> list[Document]:
+    """基于 rank_bm25 的词法搜索。"""
+    if not documents:
+        return []
+    
+    # 分词
+    tokenized_corpus = [tokenize(doc.page_content) for doc in documents]
+    bm25 = BM25Okapi(tokenized_corpus)
+    
+    tokenized_query = tokenize(question)
+    doc_scores = bm25.get_scores(tokenized_query)
+    
+    # 结合分值排序
+    scored_docs = sorted(zip(documents, doc_scores), key=lambda x: x[1], reverse=True)
+    return [doc for doc, score in scored_docs if score > 0][:k]
+
+
+def reciprocal_rank_fusion(
+    vector_docs: list[Document], 
+    bm25_docs: list[Document], 
+    k: int, 
+    c: int = 60
+) -> list[Document]:
+    """RRF (Reciprocal Rank Fusion) 排名融合算法。"""
+    scores: dict[str, float] = {}
+    doc_map: dict[str, Document] = {}
+
+    def _update_scores(docs: list[Document]):
+        for rank, doc in enumerate(docs):
+            # 使用 page_content 的哈希或内容作为 key
+            # 在实际项目中，Document 通常有 metadata 里的 id，这里简单使用内容
+            doc_id = doc.page_content
+            doc_map[doc_id] = doc
+            scores[doc_id] = scores.get(doc_id, 0) + 1.0 / (c + rank + 1)
+
+    _update_scores(vector_docs)
+    _update_scores(bm25_docs)
+
+    sorted_ids = sorted(scores.keys(), key=lambda x: scores[x], reverse=True)
+    return [doc_map[doc_id] for doc_id in sorted_ids][:k]
 
 
 def preview_question(
