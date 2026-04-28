@@ -127,13 +127,26 @@ def main() -> None:
     settings = load_settings()
     parser = build_parser()
 
+    # 注册退出清理：确保 MCP 子进程不沦为孤儿
+    import atexit
+
+    def _cleanup():
+        try:
+            from .agent import _mcp_manager
+            if _mcp_manager:
+                _mcp_manager.shutdown()
+        except Exception:
+            pass
+
+    atexit.register(_cleanup)
+
     # 获取所有子命令用于补全
     commands = []
     if parser._subparsers:
         for action in parser._subparsers._actions:
             if isinstance(action, argparse._SubParsersAction):
                 commands.extend(action.choices.keys())
-    
+
     completer = WordCompleter(
         [f"/{cmd}" for cmd in commands] + ["/exit", "/quit", "/help", "/history"],
         ignore_case=True,
@@ -146,51 +159,53 @@ def main() -> None:
 
     from .agent import chat_unified_stream, get_session_history
 
-    while True:
-        try:
-            text = session.prompt(">>> ").strip()
-        except (EOFError, KeyboardInterrupt):
-            break
-
-        if not text:
-            continue
-
-        if text.lower() in ("/exit", "/quit"):
-            break
-
-        if text.startswith("/"):
-            cmd_line = text[1:]
-            if cmd_line.lower() == "help":
-                parser.print_help()
-                continue
-
-            if cmd_line.lower() == "history":
-                print("\n--- 会话历史 ---")
-                print(get_session_history())
-                print("----------------\n")
-                continue
-            
+    try:
+        while True:
             try:
-                args = parser.parse_args(shlex.split(cmd_line))
-                if hasattr(args, "handler"):
-                    args.handler(args)
-                else:
+                text = session.prompt(">>> ").strip()
+            except (EOFError, KeyboardInterrupt):
+                break
+
+            if not text:
+                continue
+
+            if text.lower() in ("/exit", "/quit"):
+                break
+
+            if text.startswith("/"):
+                cmd_line = text[1:]
+                if cmd_line.lower() == "help":
                     parser.print_help()
-            except SystemExit:
-                # argparse 报错或帮助信息已打印，捕获退出信号以继续循环
-                continue
-            except Exception as exc:
-                logger.error("命令执行出错: %s", exc)
-                print(f"出错: {exc}")
-        else:
-            # 普通聊天
-            try:
-                sys.stdout.write("助手: ")
-                chat_unified_stream(text, settings)
-                print("\n")
-            except Exception as exc:
-                logger.error("对话出错: %s", exc)
-                print(f"出错: {exc}\n")
+                    continue
+
+                if cmd_line.lower() == "history":
+                    print("\n--- 会话历史 ---")
+                    print(get_session_history())
+                    print("----------------\n")
+                    continue
+
+                try:
+                    args = parser.parse_args(shlex.split(cmd_line))
+                    if hasattr(args, "handler"):
+                        args.handler(args)
+                    else:
+                        parser.print_help()
+                except SystemExit:
+                    continue
+                except Exception as exc:
+                    logger.error("命令执行出错: %s", exc)
+                    print(f"出错: {exc}")
+            else:
+                # 普通聊天
+                try:
+                    sys.stdout.write("助手: ")
+                    chat_unified_stream(text, settings)
+                    print("\n")
+                except Exception as exc:
+                    logger.error("对话出错: %s", exc)
+                    print(f"出错: {exc}\n")
+    finally:
+        _cleanup()
 
     print("再见！")
 

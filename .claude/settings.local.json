@@ -22,7 +22,10 @@
       "Bash(git filter-repo *)",
       "Bash(xargs -I{} git ls-tree -r --name-only {})",
       "Bash(git remote *)",
-      "Bash(echo \"EXIT_CODE=$?\")"
+      "Bash(echo \"EXIT_CODE=$?\")",
+      "mcp__zread__get_repo_structure",
+      "mcp__zread__read_file",
+      "Bash(MEMORY_PATH=/tmp/test_memory.json uv run python -m chainmaster.mcp.server.memory)"
     ]
   }
 }

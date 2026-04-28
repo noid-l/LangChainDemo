@@ -24,6 +24,7 @@ dependencies = [
     "markitdown[pdf]>=0.1.1",
     "langchain-qwq>=0.3.4",
     "prompt-toolkit>=3.0.52",
+    "mcp>=1.27.0",
 ]
 
 [project.scripts]

@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "memory": {
+      "command": "python",
+      "args": ["-m", "chainmaster.mcp.server.memory"],
+      "env": {
+        "MEMORY_PATH": "~/.chainmaster/memory_graph.json"
+      }
+    }
+  }
+}
